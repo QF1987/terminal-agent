@@ -1,0 +1,24 @@
+{
+  "name": "terminal-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build -w packages/core && npm run build -w packages/tools && npm run build -w packages/cli",
+    "clean": "rm -rf packages/*/dist vendor/*/dist"
+  },
+  "dependencies": {
+    "@mariozechner/pi-agent-core": "^0.62.0",
+    "@mariozechner/pi-ai": "^0.62.0",
+    "@mariozechner/pi-coding-agent": "^0.62.0"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.2"
+  }
+}

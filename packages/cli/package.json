@@ -1,0 +1,20 @@
+{
+  "name": "@terminal-agent/cli",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "terminal-agent": "dist/index.js"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-package.mjs packages/cli"
+  },
+  "dependencies": {
+    "@terminal-agent/core": "file:../core",
+    "@terminal-agent/tools": "file:../tools",
+    "@mariozechner/pi-agent-core": "^0.62.0",
+    "@mariozechner/pi-ai": "^0.62.0",
+    "@mariozechner/pi-coding-agent": "^0.62.0",
+    "@sinclair/typebox": "^0.34.0"
+  }
+}

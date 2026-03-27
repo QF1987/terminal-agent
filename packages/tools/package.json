@@ -1,0 +1,19 @@
+{
+  "name": "@terminal-agent/tools",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-package.mjs packages/tools"
+  },
+  "dependencies": {
+    "@terminal-agent/core": "file:../core",
+    "@mariozechner/pi-agent-core": "^0.62.0",
+    "@sinclair/typebox": "^0.34.0"
+  }
+}

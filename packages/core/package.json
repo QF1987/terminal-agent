@@ -1,0 +1,14 @@
+{
+  "name": "@terminal-agent/core",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-package.mjs packages/core"
+  }
+}
