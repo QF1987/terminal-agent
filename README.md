@@ -146,5 +146,5 @@ Agent 启动时会自动扫描并加载技能。
 
 ## 相关文章
 
-- 📖 [当 AI 学会"把脉"：我用自然语言管理 50 台自助购药机](https://mp.weixin.qq.com/s/xxxxx)（公众号首发）
+- 📖 [当 AI 学会"把脉"：我用自然语言管理 50 台自助购药机](https://mp.weixin.qq.com/s/IGr5xwuyT9lM9zX3jPY6Ew)（公众号首发）
 - 📖 Agent 的终局不是"万能"，而是"专精"（即将发布）
