@@ -126,3 +126,25 @@ Agent 启动时会自动扫描并加载技能。
 ## 许可证
 
 [Apache License 2.0](./LICENSE)
+
+## 联系方式
+
+<table>
+<tr>
+<td align="center" width="200">
+<img src="docs/qrcodes/wechat-official.jpg" width="150"><br>
+<b>微信公众号「灵枢」</b><br>
+<sub>关注获取更多 AI Agent 实践</sub>
+</td>
+<td align="center" width="200">
+<img src="docs/qrcodes/wechat-personal.jpg" width="150"><br>
+<b>个人微信</b><br>
+<sub>加我交流 Agent 开发</sub>
+</td>
+</tr>
+</table>
+
+## 相关文章
+
+- 📖 [当 AI 学会"把脉"：我用自然语言管理 50 台自助购药机](https://mp.weixin.qq.com/s/xxxxx)（公众号首发）
+- 📖 Agent 的终局不是"万能"，而是"专精"（即将发布）
