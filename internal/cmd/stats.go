@@ -1,12 +1,21 @@
+// ============================================================
+// stats.go - 设备统计命令
+// ============================================================
+// 实现 "device-ctl stats <device-id>" 子命令
+// 显示设备的运行统计数据（交易量、运行时长、故障次数）
+// ============================================================
+
 package cmd
 
 import (
 	"fmt"
 	"os"
+	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 )
 
+// --days：统计天数参数
 var statsDays int
 
 var statsCmd = &cobra.Command{
@@ -15,35 +24,32 @@ var statsCmd = &cobra.Command{
 	Long:  `查看设备运行统计数据`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		device, err := Store.GetDevice(args[0])
+		// 获取设备信息（为了显示名称）
+		dev, err := Store.GetDevice(args[0])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "错误: %v\n", err)
 			os.Exit(1)
 		}
 
-		fmt.Printf(`
-┌─────────────────────────────────────────────────┐
-│  📊 设备统计: %-35s│
-├─────────────────────────────────────────────────┤
-│                                                 │
-│  总交易数:     %-10d                        │
-│  今日交易:     %-10d                        │
-│  运行时长:     %-10d 小时                    │
-│  故障次数:     %-10d                        │
-│                                                 │
-│  日均交易:     %-10.1f                        │
-│  故障率:       %-10.2f%%                       │
-│                                                 │
-└─────────────────────────────────────────────────┘
-`,
-			device.Name,
-			device.Stats.TotalTransactions,
-			device.Stats.TodayTransactions,
-			device.Stats.Uptime,
-			device.Stats.FaultCount,
-			float64(device.Stats.TotalTransactions)/float64(max(device.Stats.Uptime/24, 1)),
-			float64(device.Stats.FaultCount)/float64(max(device.Stats.Uptime/24, 1))*100,
-		)
+		// 获取统计数据
+		stats, err := Store.GetDeviceStats(args[0], statsDays)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "错误: %v\n", err)
+			os.Exit(1)
+		}
+
+		// 格式化输出
+		fmt.Printf("\n📊 设备统计 - %s (%s)\n", dev.Name, dev.ID)
+		fmt.Printf("统计周期: 最近 %d 天\n\n", statsDays)
+
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "指标\t数值")
+		fmt.Fprintln(w, "----\t----")
+		fmt.Fprintf(w, "总交易量\t%d 笔\n", stats.TotalTransactions)
+		fmt.Fprintf(w, "今日交易\t%d 笔\n", stats.TodayTransactions)
+		fmt.Fprintf(w, "运行时长\t%d 小时\n", stats.Uptime)
+		fmt.Fprintf(w, "故障次数\t%d 次\n", stats.FaultCount)
+		w.Flush()
 	},
 }
 

@@ -1,90 +1,108 @@
+// ============================================================
+// types.go - 数据模型定义
+// ============================================================
+// 定义了所有数据结构（struct）和常量
+// 类似 TypeScript 的 interface + enum
+// ============================================================
+
 package device
 
 import "time"
 
-// 设备状态
+// ─── 设备状态常量 ─────────────────────────────────────────
+// Go 用 const 定义常量，没有 enum，通常用字符串或 iota
 const (
-	StatusOnline       = "online"
-	StatusOffline      = "offline"
-	StatusError        = "error"
-	StatusMaintenance  = "maintenance"
+	StatusOnline       = "online"       // 在线
+	StatusOffline      = "offline"      // 离线
+	StatusError        = "error"        // 故障
+	StatusMaintenance  = "maintenance"  // 维护中
 )
 
-// 区域
+// ─── 区域和设备类型 ───────────────────────────────────────
+// var：定义变量（这里是全局只读的切片）
+// []string：字符串切片（类似 TypeScript 的 string[]）
 var Regions = []string{"华东", "华南", "华北", "西南", "华中"}
-
-// 设备类型
 var DeviceTypes = []string{"自助购药机-标准版", "自助购药机-冷藏版", "自助购药机-大型版"}
 
-// 日志类型
+// ─── 日志相关常量 ─────────────────────────────────────────
 const (
-	LogHardware     = "hardware"
-	LogSoftware     = "software"
-	LogNetwork      = "network"
-	LogMedicineStock = "medicine_stock"
+	LogHardware      = "hardware"       // 硬件故障
+	LogSoftware      = "software"       // 软件故障
+	LogNetwork       = "network"        // 网络故障
+	LogMedicineStock = "medicine_stock" // 库存告警
 )
 
-// 日志严重程度
 const (
-	SeverityLow       = "low"
-	SeverityMedium    = "medium"
-	SeverityHigh      = "high"
-	SeverityCritical  = "critical"
+	SeverityLow       = "low"       // 低
+	SeverityMedium    = "medium"    // 中
+	SeverityHigh      = "high"      // 高
+	SeverityCritical  = "critical"  // 严重
 )
 
+// ─── 数据结构定义 ─────────────────────────────────────────
+// Go 用 struct 定义结构体，类似 TypeScript 的 interface
+// 字段后面的 `json:"xxx"` 是 JSON 序列化标签（类似 TS 的 @JsonProperty）
+
+// DeviceConfig：设备配置
 type DeviceConfig struct {
-	TransactionTimeout int      `json:"transactionTimeout"`
-	ScreenBrightness   int      `json:"screenBrightness"`
-	VolumeLevel        int      `json:"volumeLevel"`
-	AutoRebootEnabled  bool     `json:"autoRebootEnabled"`
-	AutoRebootTime     string   `json:"autoRebootTime"`
-	MedicineCategory   []string `json:"medicineCategory"`
+	TransactionTimeout int      `json:"transactionTimeout"` // 交易超时（秒）
+	ScreenBrightness   int      `json:"screenBrightness"`   // 屏幕亮度（%）
+	VolumeLevel        int      `json:"volumeLevel"`        // 音量（%）
+	AutoRebootEnabled  bool     `json:"autoRebootEnabled"`  // 是否启用自动重启
+	AutoRebootTime     string   `json:"autoRebootTime"`     // 自动重启时间
+	MedicineCategory   []string `json:"medicineCategory"`   // 药品分类
 }
 
+// DeviceStats：设备统计
 type DeviceStats struct {
-	TotalTransactions int `json:"totalTransactions"`
-	TodayTransactions int `json:"todayTransactions"`
-	Uptime            int `json:"uptime"`      // 小时
-	FaultCount        int `json:"faultCount"`
+	TotalTransactions int `json:"totalTransactions"` // 总交易数
+	TodayTransactions int `json:"todayTransactions"` // 今日交易数
+	Uptime            int `json:"uptime"`            // 运行时长（小时）
+	FaultCount        int `json:"faultCount"`        // 故障次数
 }
 
+// Device：设备信息（主数据模型）
 type Device struct {
-	ID            string       `json:"id"`
-	Name          string       `json:"name"`
-	Type          string       `json:"type"`
-	Region        string       `json:"region"`
-	Address       string       `json:"address"`
-	Status        string       `json:"status"`
-	LastHeartbeat time.Time    `json:"lastHeartbeat"`
-	Firmware      string       `json:"firmware"`
-	Config        DeviceConfig `json:"config"`
-	InstalledAt   time.Time    `json:"installedAt"`
-	Stats         DeviceStats  `json:"stats"`
+	ID            string       `json:"id"`            // 设备ID
+	Name          string       `json:"name"`          // 设备名称
+	Type          string       `json:"type"`          // 设备类型
+	Region        string       `json:"region"`        // 所属区域
+	Address       string       `json:"address"`       // 安装地址
+	Status        string       `json:"status"`        // 当前状态
+	LastHeartbeat time.Time    `json:"lastHeartbeat"` // 最后心跳时间
+	Firmware      string       `json:"firmware"`      // 固件版本
+	Config        DeviceConfig `json:"config"`        // 设备配置
+	InstalledAt   time.Time    `json:"installedAt"`   // 安装时间
+	Stats         DeviceStats  `json:"stats"`         // 运行统计
 }
 
+// FaultLog：故障日志
 type FaultLog struct {
-	ID         string    `json:"id"`
-	DeviceID   string    `json:"deviceId"`
-	Timestamp  time.Time `json:"timestamp"`
-	Type       string    `json:"type"`
-	Severity   string    `json:"severity"`
-	Message    string    `json:"message"`
-	Resolved   bool      `json:"resolved"`
-	ResolvedAt *time.Time `json:"resolvedAt,omitempty"`
+	ID         string     `json:"id"`                   // 日志ID
+	DeviceID   string     `json:"deviceId"`             // 设备ID
+	Timestamp  time.Time  `json:"timestamp"`            // 发生时间
+	Type       string     `json:"type"`                 // 故障类型
+	Severity   string     `json:"severity"`             // 严重程度
+	Message    string     `json:"message"`              // 故障描述
+	Resolved   bool       `json:"resolved"`             // 是否已解决
+	ResolvedAt *time.Time `json:"resolvedAt,omitempty"` // 解决时间（指针，可为 nil）
 }
 
-// 筛选条件
+// ─── 筛选条件 ─────────────────────────────────────────────
+
+// DeviceFilters：设备查询筛选条件
 type DeviceFilters struct {
-	Region  string
-	Status  string
-	Type    string
-	Keyword string
+	Region  string // 区域
+	Status  string // 状态
+	Type    string // 类型
+	Keyword string // 关键字
 }
 
+// LogFilters：日志查询筛选条件
 type LogFilters struct {
-	DeviceID string
-	Severity string
-	Type     string
-	Days     int
-	Limit    int
+	DeviceID string // 设备ID
+	Severity string // 严重程度
+	Type     string // 日志类型
+	Days     int    // 最近几天
+	Limit    int    // 返回条数
 }

@@ -1,3 +1,10 @@
+// ============================================================
+// mock.go - 模拟数据存储
+// ============================================================
+// 实现了 Store 接口，提供模拟数据
+// 用于开发和测试，不需要真实 API
+// ============================================================
+
 package store
 
 import (
@@ -8,38 +15,47 @@ import (
 	"github.com/QF1987/terminal-agent-go/internal/device"
 )
 
-// Store 数据存储接口
+// ─── 接口定义 ─────────────────────────────────────────────
+// Go 用 interface 定义接口（类似 TypeScript 的 interface）
+// 任何实现了这些方法的 struct 都算"实现了"这个接口（鸭子类型）
 type Store interface {
-	ListDevices(f device.DeviceFilters) ([]device.Device, error)
-	GetDevice(id string) (*device.Device, error)
-	GetDeviceStats(id string, days int) (*device.DeviceStats, error)
-	GetFaultLogs(f device.LogFilters) ([]device.FaultLog, error)
-	UpdateDeviceConfig(id string, config device.DeviceConfig) error
-	RebootDevice(id string, force bool) error
+	ListDevices(f device.DeviceFilters) ([]device.Device, error)          // 列出设备
+	GetDevice(id string) (*device.Device, error)                          // 获取单个设备
+	GetDeviceStats(id string, days int) (*device.DeviceStats, error)      // 获取设备统计
+	GetFaultLogs(f device.LogFilters) ([]device.FaultLog, error)          // 获取故障日志
+	UpdateDeviceConfig(id string, config device.DeviceConfig) error       // 更新配置
+	RebootDevice(id string, force bool) error                             // 重启设备
 }
 
-// MockStore 模拟数据存储
+// ─── MockStore 结构体 ─────────────────────────────────────
+// 模拟数据存储，内部用切片（slice）存储数据
+// 小写字母开头的字段是"私有"的（类似 TypeScript 的 private）
 type MockStore struct {
-	devices   []device.Device
-	faultLogs []device.FaultLog
+	devices   []device.Device    // 设备列表
+	faultLogs []device.FaultLog  // 故障日志列表
 }
 
+// NewMockStore()：工厂函数，创建并初始化 MockStore
+// Go 没有构造函数，通常用 NewXxx() 函数代替
 func NewMockStore() *MockStore {
-	s := &MockStore{}
-	s.generateData()
+	s := &MockStore{}  // & 取地址，返回指针
+	s.generateData()   // 生成模拟数据
 	return s
 }
 
+// generateData()：生成模拟数据
+// 小写开头的方法是"私有"的，只能在包内部调用
 func (s *MockStore) generateData() {
 	now := time.Now()
 
-	// 生成 50 台设备
+	// 设备模板：名称、区域、地址
+	// []struct{...}：匿名结构体切片
 	deviceTemplates := []struct {
 		name    string
 		region  string
 		address string
 	}{
-		// 华东
+		// 华东（10 台）
 		{"上海浦东-张江药房-01", "华东", "上海市浦东新区张江路100号"},
 		{"上海浦东-张江药房-02", "华东", "上海市浦东新区张江路100号"},
 		{"上海浦东-陆家嘴药房-01", "华东", "上海市浦东新区陆家嘴环路500号"},
@@ -50,7 +66,7 @@ func (s *MockStore) generateData() {
 		{"南京鼓楼-中央路药房-02", "华东", "南京市鼓楼区中央路300号"},
 		{"苏州园区-星海街药房-01", "华东", "苏州市工业园区星海街50号"},
 		{"合肥蜀山-长江西路药房-01", "华东", "合肥市蜀山区长江西路100号"},
-		// 华南
+		// 华南（8 台）
 		{"广州天河-体育西路药房-01", "华南", "广州市天河区体育西路100号"},
 		{"广州天河-体育西路药房-02", "华南", "广州市天河区体育西路100号"},
 		{"深圳南山-科技园药房-01", "华南", "深圳市南山区科技园南路50号"},
@@ -59,7 +75,7 @@ func (s *MockStore) generateData() {
 		{"珠海香洲-凤凰路药房-01", "华南", "珠海市香洲区凤凰路100号"},
 		{"东莞南城-鸿福路药房-01", "华南", "东莞市南城区鸿福路50号"},
 		{"佛山禅城-汾江路药房-01", "华南", "佛山市禅城区汾江路100号"},
-		// 华北
+		// 华北（8 台）
 		{"北京朝阳-望京药房-01", "华北", "北京市朝阳区望京西路100号"},
 		{"北京朝阳-望京药房-02", "华北", "北京市朝阳区望京西路100号"},
 		{"北京海淀-中关村药房-01", "华北", "北京市海淀区中关村大街50号"},
@@ -68,14 +84,14 @@ func (s *MockStore) generateData() {
 		{"石家庄长安-中山东路药房-01", "华北", "石家庄市长安区中山东路200号"},
 		{"济南历下-泉城路药房-01", "华北", "济南市历下区泉城路100号"},
 		{"青岛崂山-海尔路药房-01", "华北", "青岛市崂山区海尔路50号"},
-		// 西南
+		// 西南（5 台）
 		{"成都锦江-春熙路药房-01", "西南", "成都市锦江区春熙路100号"},
 		{"成都锦江-春熙路药房-02", "西南", "成都市锦江区春熙路100号"},
 		{"重庆渝中-解放碑药房-01", "西南", "重庆市渝中区解放碑步行街50号"},
 		{"重庆渝中-解放碑药房-02", "西南", "重庆市渝中区解放碑步行街50号"},
 		{"昆明五华-东风西路药房-01", "西南", "昆明市五华区东风西路100号"},
 		{"贵阳云岩-中华北路药房-01", "西南", "贵阳市云岩区中华北路50号"},
-		// 华中
+		// 华中（7 台）
 		{"武汉武昌-光谷药房-01", "华中", "武汉市武昌区光谷大道100号"},
 		{"武汉武昌-光谷药房-02", "华中", "武汉市武昌区光谷大道100号"},
 		{"武汉洪山-街道口药房-01", "华中", "武汉市洪山区街道口50号"},
@@ -85,33 +101,38 @@ func (s *MockStore) generateData() {
 		{"南昌红谷滩-红谷中大道药房-01", "华中", "南昌市红谷滩区红谷中大道50号"},
 	}
 
+	// 状态和类型选项
 	statuses := []string{device.StatusOnline, device.StatusOffline, device.StatusError, device.StatusMaintenance}
 	types := device.DeviceTypes
 
+	// ─── 生成设备数据 ─────────────────────────────────────
+	// for i, tmpl := range：Go 的 for-range 循环（类似 TypeScript 的 entries()）
 	for i, tmpl := range deviceTemplates {
+		// 随机状态，但大部分是在线的
 		status := statuses[rand.Intn(len(statuses))]
 		if i < 35 {
-			status = device.StatusOnline // 大部分在线
+			status = device.StatusOnline
 		}
 
+		// append()：向切片添加元素（类似 Array.push()）
 		s.devices = append(s.devices, device.Device{
-			ID:   fmt.Sprintf("DEV-%03d", i+1),
-			Name: tmpl.name,
-			Type: types[rand.Intn(len(types))],
-			Region: tmpl.region,
-			Address: tmpl.address,
-			Status: status,
-			LastHeartbeat: now.Add(-time.Duration(rand.Intn(3600)) * time.Second),
-			Firmware: fmt.Sprintf("2.%d.%d", rand.Intn(3), rand.Intn(10)),
+			ID:            fmt.Sprintf("DEV-%03d", i+1),  // 格式化字符串，类似模板字符串
+			Name:          tmpl.name,
+			Type:          types[rand.Intn(len(types))],
+			Region:        tmpl.region,
+			Address:       tmpl.address,
+			Status:        status,
+			LastHeartbeat: now.Add(-time.Duration(rand.Intn(3600)) * time.Second), // 随机过去1小时内
+			Firmware:      fmt.Sprintf("2.%d.%d", rand.Intn(3), rand.Intn(10)),
 			Config: device.DeviceConfig{
 				TransactionTimeout: 30,
-				ScreenBrightness:   60 + rand.Intn(40),
-				VolumeLevel:        50 + rand.Intn(50),
-				AutoRebootEnabled:  rand.Intn(2) == 1,
+				ScreenBrightness:   60 + rand.Intn(40),  // 60-99
+				VolumeLevel:        50 + rand.Intn(50),   // 50-99
+				AutoRebootEnabled:  rand.Intn(2) == 1,    // 随机 true/false
 				AutoRebootTime:     fmt.Sprintf("%02d:00", rand.Intn(6)),
 				MedicineCategory:   []string{"处方药", "OTC", "保健品"},
 			},
-			InstalledAt: now.AddDate(-1, -rand.Intn(12), 0),
+			InstalledAt: now.AddDate(-1, -rand.Intn(12), 0), // 随机过去1年内安装
 			Stats: device.DeviceStats{
 				TotalTransactions: 1000 + rand.Intn(9000),
 				TodayTransactions: rand.Intn(200),
@@ -121,13 +142,14 @@ func (s *MockStore) generateData() {
 		})
 	}
 
-	// 生成故障日志
+	// ─── 生成故障日志数据 ─────────────────────────────────
 	for i := 0; i < 100; i++ {
 		dev := s.devices[rand.Intn(len(s.devices))]
 		severities := []string{device.SeverityLow, device.SeverityMedium, device.SeverityHigh, device.SeverityCritical}
 		logTypes := []string{device.LogHardware, device.LogSoftware, device.LogNetwork, device.LogMedicineStock}
 
-		messages := map[string][]string{
+		// 故障消息模板（按类型分类）
+		messages := map[string][]string{  // map：字典（类似 TypeScript 的 Record<string, string[]>）
 			device.LogHardware: {
 				"打印机卡纸，已自动恢复",
 				"扫码器响应超时",
@@ -158,17 +180,18 @@ func (s *MockStore) generateData() {
 		msgs := messages[logType]
 		msg := msgs[rand.Intn(len(msgs))]
 
-		resolved := rand.Intn(3) > 0
-		var resolvedAt *time.Time
+		// 随机是否已解决
+		resolved := rand.Intn(3) > 0  // 2/3 概率已解决
+		var resolvedAt *time.Time       // 指针类型，可以是 nil
 		if resolved {
 			t := now.Add(-time.Duration(rand.Intn(24)) * time.Hour)
-			resolvedAt = &t
+			resolvedAt = &t  // & 取地址
 		}
 
 		s.faultLogs = append(s.faultLogs, device.FaultLog{
 			ID:         fmt.Sprintf("LOG-%03d", i+1),
 			DeviceID:   dev.ID,
-			Timestamp:  now.Add(-time.Duration(rand.Intn(720)) * time.Hour),
+			Timestamp:  now.Add(-time.Duration(rand.Intn(720)) * time.Hour), // 过去30天内
 			Type:       logType,
 			Severity:   severities[rand.Intn(len(severities))],
 			Message:    msg,
@@ -178,9 +201,14 @@ func (s *MockStore) generateData() {
 	}
 }
 
+// ─── 接口方法实现 ─────────────────────────────────────────
+// 大写开头的方法是"公开"的（类似 TypeScript 的 public）
+
+// ListDevices：列出设备（支持筛选）
 func (s *MockStore) ListDevices(f device.DeviceFilters) ([]device.Device, error) {
-	var result []device.Device
-	for _, d := range s.devices {
+	var result []device.Device  // var 声明零值切片
+	for _, d := range s.devices {  // _ 忽略索引
+		// 筛选逻辑：如果指定了条件且不匹配，跳过
 		if f.Region != "" && d.Region != f.Region {
 			continue
 		}
@@ -191,6 +219,7 @@ func (s *MockStore) ListDevices(f device.DeviceFilters) ([]device.Device, error)
 			continue
 		}
 		if f.Keyword != "" {
+			// 关键字搜索：在名称、地址、ID 中查找
 			found := false
 			for _, field := range []string{d.Name, d.Address, d.ID} {
 				if contains(field, f.Keyword) {
@@ -204,31 +233,34 @@ func (s *MockStore) ListDevices(f device.DeviceFilters) ([]device.Device, error)
 		}
 		result = append(result, d)
 	}
-	return result, nil
+	return result, nil  // Go 用返回值代替异常（类似 Go 的 error 模式）
 }
 
+// GetDevice：获取单个设备
 func (s *MockStore) GetDevice(id string) (*device.Device, error) {
 	for _, d := range s.devices {
 		if d.ID == id {
-			return &d, nil
+			return &d, nil  // 返回指针（避免复制整个结构体）
 		}
 	}
-	return nil, fmt.Errorf("设备不存在: %s", id)
+	return nil, fmt.Errorf("设备不存在: %s", id)  // 返回错误
 }
 
+// GetDeviceStats：获取设备统计
 func (s *MockStore) GetDeviceStats(id string, days int) (*device.DeviceStats, error) {
-	dev, err := s.GetDevice(id)
+	dev, err := s.GetDevice(id)  // 调用其他方法
 	if err != nil {
-		return nil, err
+		return nil, err  // 错误传播
 	}
 	return &dev.Stats, nil
 }
 
+// GetFaultLogs：获取故障日志（支持筛选）
 func (s *MockStore) GetFaultLogs(f device.LogFilters) ([]device.FaultLog, error) {
 	var result []device.FaultLog
 	limit := f.Limit
 	if limit <= 0 {
-		limit = 20
+		limit = 20  // 默认返回 20 条
 	}
 
 	for _, log := range s.faultLogs {
@@ -252,25 +284,30 @@ func (s *MockStore) GetFaultLogs(f device.LogFilters) ([]device.FaultLog, error)
 	return result, nil
 }
 
+// UpdateDeviceConfig：更新设备配置（模拟）
 func (s *MockStore) UpdateDeviceConfig(id string, config device.DeviceConfig) error {
 	for i, d := range s.devices {
 		if d.ID == id {
-			s.devices[i].Config = config
+			s.devices[i].Config = config  // 修改切片元素
 			return nil
 		}
 	}
 	return fmt.Errorf("设备不存在: %s", id)
 }
 
+// RebootDevice：重启设备（模拟）
 func (s *MockStore) RebootDevice(id string, force bool) error {
 	_, err := s.GetDevice(id)
 	if err != nil {
 		return err
 	}
-	// 模拟重启
+	// 模拟重启，实际什么都不做
 	return nil
 }
 
+// ─── 辅助函数 ─────────────────────────────────────────────
+
+// contains：字符串包含检查（Go 标准库没有 strings.Contains 的时候用）
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
 }

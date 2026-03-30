@@ -1,3 +1,10 @@
+// ============================================================
+// info.go - 设备详情命令
+// ============================================================
+// 实现 "device-ctl info <device-id>" 子命令
+// 显示单台设备的详细信息（框线表格输出）
+// ============================================================
+
 package cmd
 
 import (
@@ -8,17 +15,19 @@ import (
 )
 
 var infoCmd = &cobra.Command{
-	Use:   "info <device-id>",
+	Use:   "info <device-id>",  // <device-id> 是位置参数
 	Short: "查看设备详情",
 	Long:  `查看单台设备的详细信息`,
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.ExactArgs(1), // 要求恰好 1 个位置参数
 	Run: func(cmd *cobra.Command, args []string) {
+		// args[0] 就是设备 ID（如 DEV-001）
 		device, err := Store.GetDevice(args[0])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "错误: %v\n", err)
 			os.Exit(1)
 		}
 
+		// 状态 emoji
 		statusEmoji := map[string]string{
 			"online":       "🟢",
 			"offline":      "🔴",
@@ -27,6 +36,8 @@ var infoCmd = &cobra.Command{
 		}
 		emoji := statusEmoji[device.Status]
 
+		// 框线表格输出（类似 ASCII art）
+		// ┌─┐│├─┤└─┘：Unicode 框线字符
 		fmt.Printf(`
 ┌─────────────────────────────────────────────────┐
 │  %s  %-40s│
@@ -56,7 +67,7 @@ var infoCmd = &cobra.Command{
 			device.Address,
 			emoji, device.Status,
 			device.Firmware,
-			device.InstalledAt.Format("2006-01-02"),
+			device.InstalledAt.Format("2006-01-02"),  // Go 的时间格式化（2006-01-02 是参考时间）
 			device.LastHeartbeat.Format("2006-01-02 15:04:05"),
 			device.Stats.TotalTransactions, device.Stats.TodayTransactions,
 			device.Stats.Uptime, device.Stats.FaultCount,

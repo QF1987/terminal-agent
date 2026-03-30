@@ -1,3 +1,10 @@
+// ============================================================
+// monitor.go - 监控命令
+// ============================================================
+// 实现 "device-ctl monitor" 子命令
+// 包含两个子命令：status（概览）和 alerts（告警）
+// ============================================================
+
 package cmd
 
 import (
@@ -9,28 +16,61 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	monitorDevice   string
-	monitorSeverity string
-	monitorLimit    int
-)
-
+// ─── monitor 父命令 ───────────────────────────────────────
+// monitor 本身不执行，只是 status 和 alerts 的"父命令"
+// 类似 Linux 命令的嵌套：git remote add / git remote remove
 var monitorCmd = &cobra.Command{
 	Use:   "monitor",
 	Short: "设备监控",
-	Long:  `查看设备监控信息和告警`,
+	Long:  `设备监控命令，包含 status（状态概览）和 alerts（告警）子命令`,
 }
 
-var alertsCmd = &cobra.Command{
+// ─── monitor status 子命令 ────────────────────────────────
+var monitorStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "设备状态概览",
+	Long:  `显示所有设备的状态统计`,
+	Run: func(cmd *cobra.Command, args []string) {
+		// 获取所有设备（不筛选）
+		devices, _ := Store.ListDevices(device.DeviceFilters{})
+
+		// 按状态统计
+		// map[string]int：类似 Record<string, number>
+		counts := make(map[string]int)
+		for _, d := range devices {
+			counts[d.Status]++
+		}
+
+		// 输出统计
+		fmt.Println("\n📊 设备状态概览")
+		fmt.Println("──────────────────")
+		fmt.Printf("🟢 在线:   %d 台\n", counts["online"])
+		fmt.Printf("🔴 离线:   %d 台\n", counts["offline"])
+		fmt.Printf("⚠️  故障:   %d 台\n", counts["error"])
+		fmt.Printf("🔧 维护中: %d 台\n", counts["maintenance"])
+		fmt.Printf("──────────────────\n")
+		fmt.Printf("📦 总计:   %d 台\n", len(devices))
+	},
+}
+
+// ─── monitor alerts 子命令 ────────────────────────────────
+var (
+	monitorAlertsDevice   string
+	monitorAlertsSeverity string
+	monitorAlertsLimit    int
+)
+
+var monitorAlertsCmd = &cobra.Command{
 	Use:   "alerts",
 	Short: "查看告警",
 	Long:  `查看设备告警信息`,
 	Run: func(cmd *cobra.Command, args []string) {
+		// 筛选条件：severity 高/严重 + 未解决
 		filters := device.LogFilters{
-			DeviceID: monitorDevice,
-			Severity: monitorSeverity,
+			DeviceID: monitorAlertsDevice,
+			Severity: monitorAlertsSeverity,
 			Days:     7,
-			Limit:    monitorLimit,
+			Limit:    monitorAlertsLimit,
 		}
 
 		logs, err := Store.GetFaultLogs(filters)
@@ -39,86 +79,50 @@ var alertsCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		if len(logs) == 0 {
-			fmt.Println("✅ 没有告警信息")
+		// 只显示 high 和 critical 级别的告警
+		var alerts []device.FaultLog
+		for _, log := range logs {
+			if log.Severity == device.SeverityHigh || log.Severity == device.SeverityCritical {
+				alerts = append(alerts, log)
+			}
+		}
+
+		if len(alerts) == 0 {
+			fmt.Println("✅ 没有高严重程度的告警")
 			return
 		}
 
-		severityEmoji := map[string]string{
-			device.SeverityLow:      "ℹ️",
-			device.SeverityMedium:   "⚠️",
-			device.SeverityHigh:     "🔴",
-			device.SeverityCritical: "🚨",
-		}
+		fmt.Printf("\n🚨 告警信息（共 %d 条）\n\n", len(alerts))
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "时间\t设备\t严重程度\t类型\t描述\t状态")
-		fmt.Fprintln(w, "----\t----\t--------\t----\t----\t----")
+		fmt.Fprintln(w, "设备\t时间\t严重程度\t描述")
+		fmt.Fprintln(w, "----\t----\t--------\t----")
 
-		for _, log := range logs {
-			emoji := severityEmoji[log.Severity]
-			status := "✅ 已解决"
-			if !log.Resolved {
-				status = "❌ 未解决"
+		for _, alert := range alerts {
+			emoji := "🔴"
+			if alert.Severity == device.SeverityCritical {
+				emoji = "💀"
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s %s\t%s\t%s\t%s\n",
-				log.Timestamp.Format("01-02 15:04"),
-				log.DeviceID,
-				emoji, log.Severity,
-				log.Type,
-				log.Message,
-				status)
+			fmt.Fprintf(w, "%s\t%s\t%s %s\t%s\n",
+				alert.DeviceID,
+				alert.Timestamp.Format("01-02 15:04"),
+				emoji, alert.Severity,
+				alert.Message)
 		}
 		w.Flush()
-
-		fmt.Printf("\n共 %d 条告警\n", len(logs))
-	},
-}
-
-var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "查看设备状态概览",
-	Long:  `查看所有设备的状态概览`,
-	Run: func(cmd *cobra.Command, args []string) {
-		devices, err := Store.ListDevices(device.DeviceFilters{})
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "错误: %v\n", err)
-			os.Exit(1)
-		}
-
-		counts := make(map[string]int)
-		for _, d := range devices {
-			counts[d.Status]++
-		}
-
-		fmt.Printf(`
-┌─────────────────────────────────────────────────┐
-│  📡 设备状态概览                                 │
-├─────────────────────────────────────────────────┤
-│                                                 │
-│  🟢 在线:     %-10d                        │
-│  🔴 离线:     %-10d                        │
-│  ⚠️  故障:     %-10d                        │
-│  🔧 维护中:   %-10d                        │
-│  ─────────────────────                         │
-│  📦 总计:     %-10d                        │
-│                                                 │
-└─────────────────────────────────────────────────┘
-`,
-			counts[device.StatusOnline],
-			counts[device.StatusOffline],
-			counts[device.StatusError],
-			counts[device.StatusMaintenance],
-			len(devices),
-		)
 	},
 }
 
 func init() {
-	monitorCmd.AddCommand(alertsCmd)
-	monitorCmd.AddCommand(statusCmd)
-	monitorCmd.PersistentFlags().StringVarP(&monitorDevice, "device", "d", "", "按设备筛选")
-	monitorCmd.PersistentFlags().StringVar(&monitorSeverity, "severity", "", "按严重程度筛选 (low/medium/high/critical)")
-	monitorCmd.PersistentFlags().IntVarP(&monitorLimit, "limit", "n", 20, "返回条数限制")
+	// 添加子命令到父命令
+	monitorCmd.AddCommand(monitorStatusCmd)
+	monitorCmd.AddCommand(monitorAlertsCmd)
+
+	// alerts 的 flag
+	monitorAlertsCmd.Flags().StringVarP(&monitorAlertsDevice, "device", "D", "", "按设备ID筛选")
+	monitorAlertsCmd.Flags().StringVarP(&monitorAlertsSeverity, "severity", "S", "", "严重程度")
+	monitorAlertsCmd.Flags().IntVarP(&monitorAlertsLimit, "limit", "l", 20, "返回条数")
+
+	// 把 monitor 添加到根命令
 	rootCmd.AddCommand(monitorCmd)
 }

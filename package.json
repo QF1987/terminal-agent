@@ -10,6 +10,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "start": "./start.sh",
     "build": "npm run build -w packages/core && npm run build -w packages/tools && npm run build -w packages/cli",
     "clean": "rm -rf packages/*/dist vendor/*/dist"
   },

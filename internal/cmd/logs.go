@@ -1,3 +1,10 @@
+// ============================================================
+// logs.go - 故障日志命令
+// ============================================================
+// 实现 "device-ctl logs" 子命令
+// 查看设备故障日志，支持按设备、严重程度、类型筛选
+// ============================================================
+
 package cmd
 
 import (
@@ -10,26 +17,28 @@ import (
 )
 
 var (
-	logDeviceID string
-	logSeverity string
-	logType     string
-	logDays     int
-	logLimit    int
+	logsDevice   string  // --device：按设备ID筛选
+	logsSeverity string  // --severity：按严重程度筛选
+	logsType     string  // --type：按日志类型筛选
+	logsDays     int     // --days：最近几天
+	logsLimit    int     // --limit：返回条数
 )
 
 var logsCmd = &cobra.Command{
 	Use:   "logs",
 	Short: "查看故障日志",
-	Long:  `查看设备故障日志`,
+	Long:  `查看设备故障日志，支持按设备、严重程度、类型筛选`,
 	Run: func(cmd *cobra.Command, args []string) {
+		// 构建筛选条件
 		filters := device.LogFilters{
-			DeviceID: logDeviceID,
-			Severity: logSeverity,
-			Type:     logType,
-			Days:     logDays,
-			Limit:    logLimit,
+			DeviceID: logsDevice,
+			Severity: logsSeverity,
+			Type:     logsType,
+			Days:     logsDays,
+			Limit:    logsLimit,
 		}
 
+		// 查询日志
 		logs, err := Store.GetFaultLogs(filters)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "错误: %v\n", err)
@@ -37,55 +46,46 @@ var logsCmd = &cobra.Command{
 		}
 
 		if len(logs) == 0 {
-			fmt.Println("没有找到故障日志")
+			fmt.Println("没有找到匹配的日志")
 			return
 		}
 
-		typeEmoji := map[string]string{
-			device.LogHardware:      "🔧",
-			device.LogSoftware:      "💻",
-			device.LogNetwork:       "🌐",
-			device.LogMedicineStock: "💊",
-		}
-
+		// 严重程度到 emoji 的映射
 		severityEmoji := map[string]string{
 			device.SeverityLow:      "ℹ️",
 			device.SeverityMedium:   "⚠️",
 			device.SeverityHigh:     "🔴",
-			device.SeverityCritical: "🚨",
+			device.SeverityCritical: "💀",
 		}
+
+		// 格式化输出
+		fmt.Printf("\n📋 故障日志（共 %d 条）\n\n", len(logs))
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "ID\t时间\t设备\t类型\t严重程度\t描述\t状态")
-		fmt.Fprintln(w, "--\t----\t----\t----\t--------\t----\t----")
+		fmt.Fprintln(w, "ID\t设备\t时间\t严重程度\t类型\t状态\t描述")
+		fmt.Fprintln(w, "--\t----\t----\t--------\t----\t----\t----")
 
 		for _, log := range logs {
-			tEmoji := typeEmoji[log.Type]
-			sEmoji := severityEmoji[log.Severity]
-			status := "✅"
-			if !log.Resolved {
-				status = "❌"
+			emoji := severityEmoji[log.Severity]
+			resolved := "❌ 未解决"
+			if log.Resolved {
+				resolved = "✅ 已解决"
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s %s\t%s %s\t%s\t%s\n",
-				log.ID,
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s %s\t%s\t%s\t%s\n",
+				log.ID, log.DeviceID,
 				log.Timestamp.Format("01-02 15:04"),
-				log.DeviceID,
-				tEmoji, log.Type,
-				sEmoji, log.Severity,
-				log.Message,
-				status)
+				emoji, log.Severity,
+				log.Type, resolved, log.Message)
 		}
 		w.Flush()
-
-		fmt.Printf("\n共 %d 条日志\n", len(logs))
 	},
 }
 
 func init() {
-	logsCmd.Flags().StringVarP(&logDeviceID, "device", "d", "", "按设备ID筛选")
-	logsCmd.Flags().StringVar(&logSeverity, "severity", "", "按严重程度筛选 (low/medium/high/critical)")
-	logsCmd.Flags().StringVar(&logType, "type", "", "按类型筛选 (hardware/software/network/medicine_stock)")
-	logsCmd.Flags().IntVar(&logDays, "days", 7, "查看最近几天的日志")
-	logsCmd.Flags().IntVarP(&logLimit, "limit", "n", 20, "返回条数限制")
+	logsCmd.Flags().StringVarP(&logsDevice, "device", "D", "", "按设备ID筛选")
+	logsCmd.Flags().StringVarP(&logsSeverity, "severity", "S", "", "严重程度 (low/medium/high/critical)")
+	logsCmd.Flags().StringVarP(&logsType, "type", "T", "", "日志类型 (hardware/software/network/medicine_stock)")
+	logsCmd.Flags().IntVarP(&logsDays, "days", "d", 7, "最近几天")
+	logsCmd.Flags().IntVarP(&logsLimit, "limit", "l", 20, "返回条数")
 	rootCmd.AddCommand(logsCmd)
 }
