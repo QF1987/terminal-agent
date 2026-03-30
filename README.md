@@ -8,9 +8,12 @@ AI 驱动的终端设备管理助手 — 用自然语言管理自助购药机网
 
 ## 简介
 
-Terminal Agent 是一个基于 LLM 的智能运维助手，通过自然语言交互管理自助购药机终端设备。支持设备查询、状态监控、故障分析、批量配置和远程重启等操作。
+Terminal Agent 是一个终端设备管理方案，提供两种使用方式：
 
-> 💡 本项目是 MVP Demo，使用模拟数据，适合学习 Agent 开发和 LLM 工具调用模式。
+- **🧠 TS Agent** — 基于 LLM 的智能运维助手，用自然语言管理设备
+- **⚡ Go CLI** — 独立的命令行工具 `device-ctl`，无需 LLM 直接操作
+
+> 💡 本项目是 MVP Demo，使用模拟数据，适合学习 Agent 开发和 CLI 工具开发。
 
 ## 功能
 
@@ -21,14 +24,13 @@ Terminal Agent 是一个基于 LLM 的智能运维助手，通过自然语言交
 - ⚙️ **配置管理** — 修改设备配置（屏幕亮度、超时时间等）
 - 🔄 **远程重启** — 模拟远程重启设备
 - 🧠 **技能扩展** — 支持故障智能分析和批量配置等扩展技能
+- ⚡ **Go CLI** — 独立命令行工具，支持 list/info/stats/logs/monitor/reboot/auth/batch/firmware/terminal 全套命令
 
 ## 快速开始
 
-```bash
-# 克隆项目
-git clone https://github.com/YOUR_USERNAME/terminal-agent.git
-cd terminal-agent
+### 方式一：TS Agent（LLM 驱动，自然语言交互）
 
+```bash
 # 安装依赖
 npm install
 
@@ -42,6 +44,28 @@ cp .env.example .env
 # 运行
 OPENROUTER_API_KEY=your_key node packages/cli/dist/index.js
 ```
+
+### 方式二：Go CLI（独立命令行，无需 LLM）
+
+```bash
+# 进入 Go 目录
+cd cmd/device-ctl
+
+# 编译
+go build -o device-ctl .
+
+# 运行
+./device-ctl list                    # 查看所有设备
+./device-ctl list --area 华东        # 按区域筛选
+./device-ctl info SH-PD-001          # 查看设备详情
+./device-ctl stats SH-PD-001         # 设备统计
+./device-ctl logs --level error      # 故障日志
+./device-ctl monitor status          # 状态概览
+./device-ctl monitor alerts          # 查看告警
+./device-ctl reboot SH-PD-001        # 重启设备
+```
+
+Go CLI 基于 [cobra](https://github.com/spf13/cobra) 框架，所有命令支持 `--help` 查看用法。
 
 ### 环境变量
 
@@ -59,30 +83,46 @@ OPENROUTER_API_KEY=your_key node packages/cli/dist/index.js
 
 ```
 terminal-agent/
-├── packages/
-│   ├── core/          # 数据层：类型定义、存储、模拟数据
-│   ├── tools/         # 工具层：6 个 Agent 工具
-│   └── cli/           # 入口层：Agent 组装、系统提示词
-├── skills/            # 技能扩展
-│   ├── batch-config/  # 批量配置管理
-│   └── fault-analysis/# 故障智能分析
-└── scripts/           # 构建脚本
+├── packages/              # TS Agent 部分
+│   ├── core/              # 数据层：类型定义、存储、模拟数据
+│   ├── tools/             # 工具层：Agent 工具 + Go CLI 桥接
+│   └── cli/               # 入口层：Agent 组装、系统提示词
+├── cmd/                   # Go CLI 部分
+│   └── device-ctl/        # CLI 入口（main.go）
+├── internal/              # Go 内部包
+│   ├── cmd/               # 子命令实现（list/info/stats/logs/monitor/reboot/auth/batch/firmware/terminal）
+│   ├── device/            # 设备类型定义
+│   └── store/             # 数据存储层（Mock 数据）
+├── skills/                # 技能扩展
+│   ├── batch-config/      # 批量配置管理
+│   └── fault-analysis/    # 故障智能分析
+└── scripts/               # 构建脚本
 ```
 
 ### 包依赖
 
 ```
+# TS Agent
 cli → tools → core
   ↘ pi-ai, pi-agent-core
+
+# Go CLI
+device-ctl → internal/cmd → internal/store, internal/device
 ```
 
 ## 技术栈
 
+### TS Agent
 - **TypeScript** — 类型安全的 JavaScript
 - **npm workspaces** — Monorepo 管理
 - **[pi-agent-core](https://github.com/nickthecook/pi-agent-core)** — Agent 运行时（工具调用循环）
 - **[pi-ai](https://github.com/nickthecook/pi-ai)** — LLM 抽象层（支持 OpenAI 兼容 API）
 - **[TypeBox](https://github.com/sinclairzx81/typebox)** — 参数校验
+
+### Go CLI
+- **Go** — 高性能编译型语言
+- **[Cobra](https://github.com/spf13/cobra)** — CLI 框架
+- **Mock 数据层** — 50 台设备，5 个区域，100 条故障日志
 
 ## 对话示例
 
