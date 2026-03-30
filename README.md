@@ -1,14 +1,37 @@
 # Terminal Agent 🤖
 
-AI 驱动的终端设备管理助手 — 用自然语言管理自助购药机网络。
+**设备越来越多，人管不过来了。让设备自己管自己。**
+
+AI 驱动的终端设备管理方案 — 从"人管设备"到"设备自治"。
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-green.svg)](https://nodejs.org/)
+[![Go](https://img.shields.io/badge/Go-%3E%3D1.21-cyan.svg)](https://go.dev/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
+
+## 为什么需要 DeviceOps？
+
+设备管理的现状：
+
+| 方案 | 能做什么 | 缺什么 |
+|------|----------|--------|
+| **MDM** | 装软件、锁设备、推配置 | 不会思考，不知道为什么出问题 |
+| **IoT 平台** | 采集数据、做看板、发告警 | 告警之后还是靠人 |
+| **传统运维** | SSH 上去看日志、手动重启 | 设备一多就撑不住 |
+
+> 三个方案解决了"看见"和"控制"，但都没解决**"决策"**。
+>
+> DeviceOps 的核心理念：**不是人管设备，而是设备自管理。**
+
+三层架构：
+
+- **感知层** — 设备知道自己怎么了（网络断了、磁盘满了、温度过高）
+- **决策层** — 设备知道该怎么做（根据规则和历史自动判断恢复策略）
+- **执行层** — 设备自己动手（自动执行恢复，人只看结果）
 
 ## 简介
 
-Terminal Agent 是一个终端设备管理方案，提供两种使用方式：
+Terminal Agent 是 DeviceOps 理念的 MVP 实现，提供两种使用方式：
 
 - **🧠 TS Agent** — 基于 LLM 的智能运维助手，用自然语言管理设备
 - **⚡ Go CLI** — 独立的命令行工具 `device-ctl`，无需 LLM 直接操作
