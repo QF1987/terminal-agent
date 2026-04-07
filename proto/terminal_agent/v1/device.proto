@@ -1,0 +1,127 @@
+syntax = "proto3";
+package terminal_agent.v1;
+
+option go_package = "github.com/QF1987/terminal-agent-go/gen/terminal_agent/v1";
+
+// ============================================================
+// 设备相关消息定义
+// ============================================================
+
+// 设备身份认证（放在 gRPC metadata 里）
+// 第一阶段用 token，后续升级为 HMAC 签名
+message AuthContext {
+  string device_id = 1;
+  string token = 2;            // 第一阶段：直接传 token
+  // 第二阶段取消 token，改用下面三个字段
+  // int64  timestamp = 3;
+  // string nonce = 4;
+  // string signature = 5;     // HMAC-SHA256(secret, device_id + timestamp + nonce)
+}
+
+// 设备能力声明
+message DeviceCapability {
+  string firmware_version = 1;          // "v2.3.1"
+  int32  proto_version = 2;             // 协议版本号
+  repeated string supported_features = 3;
+  // 可选值：
+  //   "heartbeat_basic"      - 基础心跳
+  //   "heartbeat_metrics"    - 心跳带 CPU/内存/磁盘指标
+  //   "event_report"         - 事件上报
+  //   "status_report"        - 完整状态快照
+  //   "config_push"          - 接收远程配置下发
+  //   "command_reboot"       - 支持远程重启
+  //   "command_firmware"     - 支持 OTA 固件升级
+}
+
+// 心跳请求（轻量，每 30-60 秒）
+message HeartbeatRequest {
+  string device_id = 1;
+  int64  timestamp = 2;                 // 毫秒时间戳
+  float  cpu_percent = 3;
+  float  memory_percent = 4;
+  float  disk_percent = 5;
+  int32  uptime_seconds = 6;
+  DeviceCapability capability = 7;      // 首次/升级后带上
+}
+
+// 心跳响应
+message HeartbeatResponse {
+  bool   has_pending_command = 1;       // 提示设备有待执行指令
+  int64  server_time = 2;              // 时钟同步
+}
+
+// 设备性能指标
+message DeviceMetrics {
+  float  cpu_percent = 1;
+  float  memory_percent = 2;
+  float  disk_percent = 3;
+  int64  network_rx_bytes = 4;
+  int64  network_tx_bytes = 5;
+  int32  transaction_count_today = 6;
+  int32  uptime_seconds = 7;
+}
+
+// 设备配置
+message DeviceConfig {
+  int32  transaction_timeout = 1;
+  int32  screen_brightness = 2;
+  int32  volume_level = 3;
+  bool   auto_reboot_enabled = 4;
+  string auto_reboot_time = 5;
+  repeated string medicine_category = 6;
+}
+
+// 状态上报（完整快照，每 5 分钟）
+message StatusReport {
+  string device_id = 1;
+  int64  timestamp = 2;
+  string status = 3;                    // online / offline / error / maintenance
+  string firmware_version = 4;
+  DeviceMetrics metrics = 5;
+  DeviceConfig config = 6;
+}
+
+// 状态上报响应
+message StatusReportResponse {
+  bool   accepted = 1;
+  string message = 2;
+}
+
+// 事件上报（故障/交易，实时）
+message EventReport {
+  string device_id = 1;
+  int64  timestamp = 2;
+  string event_type = 3;               // fault / transaction_fail / config_change / reboot
+  string severity = 4;                  // low / medium / high / critical
+  string message = 5;
+  string detail_json = 6;              // 扩展字段，JSON 格式
+}
+
+// 事件上报响应
+message EventReportResponse {
+  bool   accepted = 1;
+  string message = 2;
+}
+
+// 指令（服务端 → 设备）
+message Command {
+  string command_id = 1;
+  string command_type = 2;             // reboot / update_config / upgrade_firmware / custom
+  string payload_json = 3;             // 指令参数，JSON 格式
+  int64  issued_at = 4;
+  int64  timeout_seconds = 5;
+}
+
+// 指令流请求（设备连上来挂着等）
+message CommandStreamRequest {
+  string device_id = 1;
+}
+
+// 指令执行结果（设备 → 服务端）
+message CommandResult {
+  string command_id = 1;
+  string device_id = 2;
+  string status = 3;                   // success / failed / timeout
+  string message = 4;                  // 执行结果描述
+  int64  executed_at = 5;
+}
