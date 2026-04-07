@@ -167,44 +167,49 @@ message DeviceMetrics {
 
 // 设备配置
 // 设备当前的运行配置，与 devices 表的 config JSON 字段对应
+// 只保留所有终端类型通用的配置项，业务相关配置放 custom_config_json
 message DeviceConfig {
-  // 交易超时时间，单位秒
-  // 用户在设备上操作购药，超过此时间未完成则自动取消
-  // 建议范围：15-120 秒，默认 30 秒
-  int32  transaction_timeout = 1;
-
   // 屏幕亮度，0-100
   // 0 = 最暗（关屏），100 = 最亮
-  int32  screen_brightness = 2;
+  // 适用于有屏幕的终端（售药机、售货机、信息屏等）
+  // 无屏幕终端（网关、摄像头）可传 0 或忽略
+  int32  screen_brightness = 1;
 
   // 音量，0-100
   // 0 = 静音，100 = 最大
-  int32  volume_level = 3;
+  // 适用于有喇叭的终端
+  // 无声音终端可传 0 或忽略
+  int32  volume_level = 2;
 
   // 是否开启自动重启
   // true：设备在 auto_reboot_time 指定的时间自动重启
   // false：不自动重启（需要手动 reboot 指令）
-  bool   auto_reboot_enabled = 4;
+  // 所有终端类型通用
+  bool   auto_reboot_enabled = 3;
 
   // 自动重启时间，格式 "HH:MM"（24 小时制）
   // 示例："03:00" 表示每天凌晨 3 点自动重启
   // 仅在 auto_reboot_enabled = true 时有效
-  string auto_reboot_time = 5;
+  // 所有终端类型通用
+  string auto_reboot_time = 4;
 
   // 业务自定义配置，JSON 格式字符串
   // 通用终端管理不关心具体业务，由上层业务系统自行定义和解析
   //
   // 示例（自助购药机）：
-  //   {"medicine_category": ["处方药", "OTC", "保健品"], "max_stock_per_slot": 50}
+  //   {"transaction_timeout": 30, "medicine_category": ["处方药", "OTC"], "max_stock_per_slot": 50}
   //
   // 示例（充电桩）：
-  //   {"max_power_kw": 60, "support_modes": ["fast", "slow"]}
+  //   {"session_timeout": 3600, "max_power_kw": 60, "support_modes": ["fast", "slow"]}
   //
   // 示例（自助售货机）：
-  //   {"product_slots": 40, "accept_coins": true, "accept_cards": true}
+  //   {"payment_timeout": 60, "product_slots": 40, "accept_coins": true}
+  //
+  // 示例（监控摄像头）：
+  //   {"recording_duration": 300, "motion_sensitivity": 70}
   //
   // 如果当前设备没有业务自定义配置，传空字符串 ""
-  string custom_config_json = 6;
+  string custom_config_json = 5;
 }
 
 // 状态上报（完整快照）
