@@ -2,7 +2,10 @@ module github.com/QF1987/terminal-agent-go
 
 go 1.26.1
 
-require github.com/spf13/cobra v1.10.2
+require (
+	github.com/lib/pq v1.12.1
+	github.com/spf13/cobra v1.10.2
+)
 
 require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect

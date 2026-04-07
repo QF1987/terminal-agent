@@ -11,13 +11,41 @@
 
 // ─── Node.js 内置模块 ─────────────────────────────────────
 import readline from "node:readline";
-// readline：逐行读取输入的模块
-// 用于实现命令行交互（用户输入一行 → 处理一行）
-
 import { stdin as input, stdout as output } from "node:process";
-// stdin：标准输入（键盘）
-// stdout：标准输出（终端屏幕）
-// 重命名成 input/output，更直观
+import { readFileSync, existsSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// ─── 加载 .env ────────────────────────────────────────────
+function loadEnv() {
+  // 从 cli 目录往上找 .env
+  const candidates = [
+    resolve(__dirname, "..", ".env"),        // packages/cli/.env
+    resolve(__dirname, "..", "..", ".env"),  // packages/.env
+    resolve(__dirname, "..", "..", "..", ".env"), // 项目根目录
+  ];
+  for (const path of candidates) {
+    if (existsSync(path)) {
+      const content = readFileSync(path, "utf-8");
+      for (const line of content.split("\n")) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const eqIdx = trimmed.indexOf("=");
+        if (eqIdx === -1) continue;
+        const key = trimmed.slice(0, eqIdx).trim();
+        const val = trimmed.slice(eqIdx + 1).trim();
+        if (!process.env[key]) {
+          process.env[key] = val;
+        }
+      }
+      break;
+    }
+  }
+}
+
+loadEnv();
 
 import { createTerminalAgent } from "./agent.js";
 // 导入创建 Agent 的函数
@@ -69,6 +97,11 @@ async function main() {
   let accumulatedContent = "";  // 累积助手回复内容（用于流式输出）
 
   agent.subscribe((event: any) => {
+    // DEBUG: 打印所有事件类型
+    if (process.env.DEBUG_AGENT) {
+      console.log(`[DEBUG] event: ${event.type}`, JSON.stringify(event).slice(0, 200));
+    }
+
     // 事件：助手消息内容更新（流式输出）
     if (event.type === "message_update" && event.message?.role === "assistant") {
       const texts = event.message.content

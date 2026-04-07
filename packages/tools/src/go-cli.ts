@@ -252,6 +252,62 @@ export function createGoBatchRebootTool(): AgentTool {
   };
 }
 
+// ─── Auth 工具 ─────────────────────────────────────────────
+export function createGoAuthWhoamiTool(): AgentTool {
+  return {
+    name: "go_auth_whoami",
+    label: "查看当前用户(Go)",
+    description: "查看当前登录用户信息。调用 Go CLI 实现。",
+    parameters: Type.Object({}),
+    async execute(_toolCallId: string, _input: any) {
+      const result = execCli(["auth", "whoami"]);
+      return { content: [{ type: "text" as const, text: result }], details: { command: "go_auth_whoami" } };
+    }
+  };
+}
+
+export function createGoAuthGrantTool(): AgentTool {
+  return {
+    name: "go_auth_grant",
+    label: "授权用户(Go)",
+    description: "授权用户访问指定区域或设备。调用 Go CLI 实现。",
+    parameters: Type.Object({
+      user: Type.String({ description: "目标用户ID（必填）" }),
+      region: Type.Optional(Type.String({ description: "授权区域" })),
+      device: Type.Optional(Type.String({ description: "授权设备ID" })),
+      role: Type.Optional(Type.String({ description: "授权角色" }))
+    }),
+    async execute(_toolCallId: string, input: any) {
+      const args = ["auth", "grant", "--user", input.user];
+      if (input.region) args.push("--region", input.region);
+      if (input.device) args.push("--device", input.device);
+      if (input.role) args.push("--role", input.role);
+      const result = execCli(args);
+      return { content: [{ type: "text" as const, text: result }], details: { command: "go_auth_grant", args: input } };
+    }
+  };
+}
+
+export function createGoAuthRevokeTool(): AgentTool {
+  return {
+    name: "go_auth_revoke",
+    label: "撤销授权(Go)",
+    description: "撤销用户的访问权限。调用 Go CLI 实现。",
+    parameters: Type.Object({
+      user: Type.String({ description: "目标用户ID（必填）" }),
+      region: Type.Optional(Type.String({ description: "撤销区域" })),
+      device: Type.Optional(Type.String({ description: "撤销设备ID" }))
+    }),
+    async execute(_toolCallId: string, input: any) {
+      const args = ["auth", "revoke", "--user", input.user];
+      if (input.region) args.push("--region", input.region);
+      if (input.device) args.push("--device", input.device);
+      const result = execCli(args);
+      return { content: [{ type: "text" as const, text: result }], details: { command: "go_auth_revoke", args: input } };
+    }
+  };
+}
+
 // ─── 一键创建所有 Go CLI 工具 ─────────────────────────────
 export function createGoCLITools(): AgentTool[] {
   return [
@@ -266,6 +322,9 @@ export function createGoCLITools(): AgentTool[] {
     createGoFirmwareUpgradeTool(),
     createGoTerminalInfoTool(),
     createGoTerminalNetworkTool(),
-    createGoBatchRebootTool()
+    createGoBatchRebootTool(),
+    createGoAuthWhoamiTool(),
+    createGoAuthGrantTool(),
+    createGoAuthRevokeTool()
   ];
 }

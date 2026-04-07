@@ -8,6 +8,7 @@
 package cmd
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 
@@ -17,7 +18,7 @@ import (
 
 // 全局变量：数据存储
 // 所有子命令都可以通过 Store 访问数据
-// 现在用的是 MockStore（模拟数据），以后可以换成真实 API
+// 优先使用 PostgreSQL，失败则 fallback 到 MockStore
 var (
 	Store store.Store
 
@@ -36,7 +37,29 @@ var (
 // init() 函数：Go 的特殊函数，在 main() 之前自动执行
 // 这里用来初始化全局变量
 func init() {
-	// 创建模拟数据存储（50 台设备 + 100 条故障日志）
+	// 优先尝试连接 PostgreSQL
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		dbURL = "postgres://deviceops:deviceops123@localhost:5432/deviceops?sslmode=disable"
+	}
+
+	db, err := sql.Open("postgres", dbURL)
+	if err == nil {
+		// 测试连接
+		if err = db.Ping(); err == nil {
+			// 建表
+			if err = store.InitSchema(db); err == nil {
+				// Seed 数据（如果表为空）
+				if err = store.SeedData(db); err == nil {
+					Store = store.NewPGStore(db)
+					return
+				}
+			}
+		}
+		db.Close()
+	}
+
+	// PostgreSQL 连接失败，使用 MockStore
 	Store = store.NewMockStore()
 }
 
