@@ -34,3 +34,6 @@ bin/
 
 # Private docs
 terminal-system-context.md
+docs/
+!docs/qrcodes/
+!docs/skills-guide.md
