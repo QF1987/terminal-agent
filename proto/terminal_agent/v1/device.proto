@@ -191,10 +191,20 @@ message DeviceConfig {
   // 仅在 auto_reboot_enabled = true 时有效
   string auto_reboot_time = 5;
 
-  // 该设备支持的药品类别
-  // 示例：["处方药", "OTC", "保健品"]
-  // 用于库存管理和前端展示
-  repeated string medicine_category = 6;
+  // 业务自定义配置，JSON 格式字符串
+  // 通用终端管理不关心具体业务，由上层业务系统自行定义和解析
+  //
+  // 示例（自助购药机）：
+  //   {"medicine_category": ["处方药", "OTC", "保健品"], "max_stock_per_slot": 50}
+  //
+  // 示例（充电桩）：
+  //   {"max_power_kw": 60, "support_modes": ["fast", "slow"]}
+  //
+  // 示例（自助售货机）：
+  //   {"product_slots": 40, "accept_coins": true, "accept_cards": true}
+  //
+  // 如果当前设备没有业务自定义配置，传空字符串 ""
+  string custom_config_json = 6;
 }
 
 // 状态上报（完整快照）
