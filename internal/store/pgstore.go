@@ -548,3 +548,54 @@ func (s *PGStore) scanCommand(row *sql.Row) (*device.Command, error) {
 	}
 	return &cmd, nil
 }
+
+// ─── 设备状态/能力更新 ───────────────────────────────────
+
+// UpdateDeviceStatus：更新设备状态和最后心跳时间
+func (s *PGStore) UpdateDeviceStatus(id string, status string) error {
+	result, err := s.db.Exec(
+		"UPDATE devices SET status = $1, last_heartbeat = NOW() WHERE id = $2",
+		status, id,
+	)
+	if err != nil {
+		return err
+	}
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("设备不存在: %s", id)
+	}
+	return nil
+}
+
+// UpdateDeviceCapabilities：更新设备能力声明
+func (s *PGStore) UpdateDeviceCapabilities(id string, cap device.DeviceCapability) error {
+	capJSON, err := json.Marshal(cap)
+	if err != nil {
+		return fmt.Errorf("序列化能力声明失败: %w", err)
+	}
+	result, err := s.db.Exec(
+		"UPDATE devices SET capabilities = $1 WHERE id = $2",
+		capJSON, id,
+	)
+	if err != nil {
+		return err
+	}
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("设备不存在: %s", id)
+	}
+	return nil
+}
+
+// CreateFaultLog：创建故障/事件日志
+func (s *PGStore) CreateFaultLog(log device.FaultLog) error {
+	var resolvedAt interface{}
+	if log.ResolvedAt != nil {
+		resolvedAt = *log.ResolvedAt
+	}
+	_, err := s.db.Exec(`
+		INSERT INTO fault_logs (id, device_id, timestamp, type, severity, message, resolved, resolved_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`, log.ID, log.DeviceID, log.Timestamp, log.Type, log.Severity, log.Message, log.Resolved, resolvedAt)
+	return err
+}

@@ -24,6 +24,8 @@ type Store interface {
 	GetDeviceStats(id string, days int) (*device.DeviceStats, error)      // 获取设备统计
 	GetFaultLogs(f device.LogFilters) ([]device.FaultLog, error)          // 获取故障日志
 	UpdateDeviceConfig(id string, config device.DeviceConfig) error       // 更新配置
+	UpdateDeviceStatus(id string, status string) error                    // 更新设备状态
+	UpdateDeviceCapabilities(id string, cap device.DeviceCapability) error // 更新设备能力
 	RebootDevice(id string, force bool) error                             // 重启设备
 	// 指令相关
 	CreateCommand(cmd device.Command) error                               // 创建指令
@@ -34,6 +36,8 @@ type Store interface {
 	UpdateCommandStatus(id string, status string, resultMessage string) error // 更新指令状态
 	UpdateCommandResultByUUID(commandID string, status string, message string) error // 设备回报结果
 	ExpireTimedOutCommands() (int64, error)                               // 超时指令标记
+	// 日志相关
+	CreateFaultLog(log device.FaultLog) error                             // 创建故障日志
 }
 
 // ─── MockStore 结构体 ─────────────────────────────────────
@@ -439,4 +443,30 @@ func (s *MockStore) ExpireTimedOutCommands() (int64, error) {
 		}
 	}
 	return count, nil
+}
+
+func (s *MockStore) UpdateDeviceStatus(id string, status string) error {
+	for i, d := range s.devices {
+		if d.ID == id {
+			s.devices[i].Status = status
+			s.devices[i].LastHeartbeat = time.Now()
+			return nil
+		}
+	}
+	return fmt.Errorf("设备不存在: %s", id)
+}
+
+func (s *MockStore) UpdateDeviceCapabilities(id string, cap device.DeviceCapability) error {
+	for i, d := range s.devices {
+		if d.ID == id {
+			s.devices[i].Capabilities = cap
+			return nil
+		}
+	}
+	return fmt.Errorf("设备不存在: %s", id)
+}
+
+func (s *MockStore) CreateFaultLog(log device.FaultLog) error {
+	s.faultLogs = append(s.faultLogs, log)
+	return nil
 }
