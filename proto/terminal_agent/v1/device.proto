@@ -157,12 +157,8 @@ message DeviceMetrics {
   // 累计网络发送字节数（本次启动以来）
   int64  network_tx_bytes = 5;
 
-  // 今日交易笔数
-  // 服务端可据此判断设备是否"静默故障"（在线但无交易）
-  int32  transaction_count_today = 6;
-
   // 设备运行时长，单位秒（本次启动以来）
-  int32  uptime_seconds = 7;
+  int32  uptime_seconds = 6;
 }
 
 // 设备配置
