@@ -142,10 +142,9 @@ func (s *MockStore) generateData() {
 			},
 			InstalledAt: now.AddDate(-1, -rand.Intn(12), 0), // 随机过去1年内安装
 			Stats: device.DeviceStats{
-				TotalTransactions: 1000 + rand.Intn(9000),
-				TodayTransactions: rand.Intn(200),
-				Uptime:            100 + rand.Intn(8000),
-				FaultCount:        rand.Intn(20),
+				Uptime:          100 + rand.Intn(8000),
+				FaultCount:      rand.Intn(20),
+				CustomStatsJSON: fmt.Sprintf(`{"total_transactions":%d,"today_transactions":%d}`, 1000+rand.Intn(9000), rand.Intn(200)),
 			},
 		})
 	}

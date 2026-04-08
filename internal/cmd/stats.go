@@ -45,8 +45,6 @@ var statsCmd = &cobra.Command{
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 		fmt.Fprintln(w, "指标\t数值")
 		fmt.Fprintln(w, "----\t----")
-		fmt.Fprintf(w, "总交易量\t%d 笔\n", stats.TotalTransactions)
-		fmt.Fprintf(w, "今日交易\t%d 笔\n", stats.TodayTransactions)
 		fmt.Fprintf(w, "运行时长\t%d 小时\n", stats.Uptime)
 		fmt.Fprintf(w, "故障次数\t%d 次\n", stats.FaultCount)
 		w.Flush()

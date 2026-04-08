@@ -56,21 +56,19 @@ type DeviceConfig struct {
 // DeviceMetrics：设备性能指标（对应 proto DeviceMetrics）
 // 用于 StatusReport 和未来的 KAIROS 感知层
 type DeviceMetrics struct {
-	CPUPercent           float32 `json:"cpuPercent"`           // CPU 使用率，0.0-100.0
-	MemoryPercent        float32 `json:"memoryPercent"`        // 内存使用率，0.0-100.0
-	DiskPercent          float32 `json:"diskPercent"`          // 磁盘使用率，0.0-100.0
-	NetworkRxBytes       int64   `json:"networkRxBytes"`       // 累计网络接收字节
-	NetworkTxBytes       int64   `json:"networkTxBytes"`       // 累计网络发送字节
-	TransactionCountToday int32  `json:"transactionCountToday"` // 今日交易笔数
-	UptimeSeconds        int32   `json:"uptimeSeconds"`        // 运行时长（秒）
+	CPUPercent     float32 `json:"cpuPercent"`     // CPU 使用率，0.0-100.0
+	MemoryPercent  float32 `json:"memoryPercent"`  // 内存使用率，0.0-100.0
+	DiskPercent    float32 `json:"diskPercent"`    // 磁盘使用率，0.0-100.0
+	NetworkRxBytes int64   `json:"networkRxBytes"` // 累计网络接收字节
+	NetworkTxBytes int64   `json:"networkTxBytes"` // 累计网络发送字节
+	UptimeSeconds  int32   `json:"uptimeSeconds"`  // 运行时长（秒）
 }
 
-// DeviceStats：设备统计
+// DeviceStats：设备统计（通用字段 + 业务自定义）
 type DeviceStats struct {
-	TotalTransactions int `json:"totalTransactions"` // 总交易数
-	TodayTransactions int `json:"todayTransactions"` // 今日交易数
-	Uptime            int `json:"uptime"`            // 运行时长（小时）
-	FaultCount        int `json:"faultCount"`        // 故障次数
+	Uptime          int    `json:"uptime"`          // 运行时长（小时）
+	FaultCount      int    `json:"faultCount"`      // 故障次数
+	CustomStatsJSON string `json:"customStatsJson"` // 业务自定义统计（JSON 字符串）
 }
 
 // DeviceCapability：设备能力声明（对应 proto DeviceCapability）

@@ -52,7 +52,6 @@ var infoCmd = &cobra.Command{
 │  最后心跳: %-36s│
 ├─────────────────────────────────────────────────┤
 │  运行统计                                        │
-│  总交易:   %-10d  今日交易: %-10d        │
 │  运行时长: %-10d小时  故障次数: %-10d      │
 ├─────────────────────────────────────────────────┤
 │  设备配置                                        │
@@ -69,7 +68,6 @@ var infoCmd = &cobra.Command{
 			device.Firmware,
 			device.InstalledAt.Format("2006-01-02"),  // Go 的时间格式化（2006-01-02 是参考时间）
 			device.LastHeartbeat.Format("2006-01-02 15:04:05"),
-			device.Stats.TotalTransactions, device.Stats.TodayTransactions,
 			device.Stats.Uptime, device.Stats.FaultCount,
 			device.Config.ScreenBrightness, device.Config.VolumeLevel,
 			device.Config.AutoRebootEnabled, device.Config.AutoRebootTime,

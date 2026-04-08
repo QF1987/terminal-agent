@@ -220,10 +220,9 @@ func SeedData(db *sql.DB) error {
 
 		// 构建设备统计（随机生成）
 		stats := device.DeviceStats{
-			TotalTransactions: 1000 + rand.Intn(9000),  // 总交易量 1000-9999
-			TodayTransactions: rand.Intn(200),           // 今日交易量 0-199
-			Uptime:            100 + rand.Intn(8000),    // 在线时长（小时）100-8099
-			FaultCount:        rand.Intn(20),            // 故障次数 0-19
+			Uptime:          100 + rand.Intn(8000),    // 在线时长（小时）100-8099
+			FaultCount:      rand.Intn(20),            // 故障次数 0-19
+			CustomStatsJSON: fmt.Sprintf(`{"total_transactions":%d,"today_transactions":%d}`, 1000+rand.Intn(9000), rand.Intn(200)),
 		}
 		statsJSON, _ := json.Marshal(stats)
 
