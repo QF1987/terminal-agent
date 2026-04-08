@@ -52,13 +52,16 @@ func (s *PGStore) scanDevice(row *sql.Row) (*device.Device, error) {
 	var configJSON string  // 数据库中 config 字段是 JSONB 类型，读出来是字符串
 	var statsJSON string   // 同上，stats 也是 JSONB
 	var lastHeartbeat, installedAt time.Time  // 数据库 TIMESTAMP 类型，读出来是 time.Time
+	var token, deviceSecret sql.NullString    // 可为 NULL 的字符串
+	var capabilitiesJSON sql.NullString       // 可为 NULL 的 JSONB
 
 	// Scan 按 SELECT 列的顺序，逐个填入变量地址（& 取地址）
 	// 必须保证 SELECT 的列顺序和 Scan 的参数顺序完全一致
 	err := row.Scan(
 		&d.ID, &d.Name, &d.Type, &d.Region, &d.Address,   // 基本字段直接映射
 		&d.Status, &lastHeartbeat, &d.Firmware,
-		&configJSON, &installedAt, &statsJSON,  // JSON 字段先读成字符串
+		&configJSON, &installedAt, &statsJSON,
+		&token, &deviceSecret, &capabilitiesJSON,  // 新增字段
 	)
 	if err != nil {
 		return nil, err  // 查询失败（比如设备不存在时会返回 sql.ErrNoRows）
@@ -66,6 +69,17 @@ func (s *PGStore) scanDevice(row *sql.Row) (*device.Device, error) {
 
 	d.LastHeartbeat = lastHeartbeat  // 把临时变量赋值给结构体字段
 	d.InstalledAt = installedAt
+
+	// 处理可为 NULL 的字段
+	if token.Valid {
+		d.Token = token.String
+	}
+	if deviceSecret.Valid {
+		d.DeviceSecret = deviceSecret.String
+	}
+	if capabilitiesJSON.Valid {
+		json.Unmarshal([]byte(capabilitiesJSON.String), &d.Capabilities)
+	}
 
 	// json.Unmarshal：把 JSON 字符串解析成 Go 结构体
 	// []byte(configJSON)：把 string 转成 []byte（字节切片），这是 Unmarshal 要求的参数类型
@@ -124,7 +138,7 @@ func (s *PGStore) ListDevices(f device.DeviceFilters) ([]device.Device, error) {
 
 	// 动态拼接 SQL 查询语句
 	// 注意：生产环境应该用参数化查询防止 SQL 注入，这里的 keyword 部分已经用了 $ 参数
-	query := "SELECT id, name, type, region, address, status, last_heartbeat, firmware, config, installed_at, stats FROM devices"
+	query := "SELECT id, name, type, region, address, status, last_heartbeat, firmware, config, installed_at, stats, token, device_secret, capabilities FROM devices"
 	if len(where) > 0 {
 		query += " WHERE " + strings.Join(where, " AND ")  // 用 AND 连接所有条件
 	}
@@ -145,12 +159,15 @@ func (s *PGStore) ListDevices(f device.DeviceFilters) ([]device.Device, error) {
 		var d device.Device
 		var configJSON, statsJSON string
 		var lastHeartbeat, installedAt time.Time
+		var token, deviceSecret sql.NullString
+		var capabilitiesJSON sql.NullString
 
 		// 每一行都 Scan 一次，把列值读入变量
 		err := rows.Scan(
 			&d.ID, &d.Name, &d.Type, &d.Region, &d.Address,
 			&d.Status, &lastHeartbeat, &d.Firmware,
 			&configJSON, &installedAt, &statsJSON,
+			&token, &deviceSecret, &capabilitiesJSON,
 		)
 		if err != nil {
 			return nil, err  // Scan 失败，直接返回错误
@@ -158,6 +175,15 @@ func (s *PGStore) ListDevices(f device.DeviceFilters) ([]device.Device, error) {
 
 		d.LastHeartbeat = lastHeartbeat
 		d.InstalledAt = installedAt
+		if token.Valid {
+			d.Token = token.String
+		}
+		if deviceSecret.Valid {
+			d.DeviceSecret = deviceSecret.String
+		}
+		if capabilitiesJSON.Valid {
+			json.Unmarshal([]byte(capabilitiesJSON.String), &d.Capabilities)
+		}
 
 		// JSON 反序列化（同 scanDevice 中的逻辑）
 		if err := json.Unmarshal([]byte(configJSON), &d.Config); err != nil {
@@ -181,7 +207,7 @@ func (s *PGStore) GetDevice(id string) (*device.Device, error) {
 	// $1 是 PostgreSQL 的参数占位符，对应第二个参数 id
 	// 用 $1 而不是字符串拼接，是为了防止 SQL 注入攻击
 	row := s.db.QueryRow(
-		"SELECT id, name, type, region, address, status, last_heartbeat, firmware, config, installed_at, stats FROM devices WHERE id = $1",
+		"SELECT id, name, type, region, address, status, last_heartbeat, firmware, config, installed_at, stats, token, device_secret, capabilities FROM devices WHERE id = $1",
 		id,
 	)
 	return s.scanDevice(row)  // 复用 scanDevice 辅助方法解析结果
@@ -323,4 +349,202 @@ func (s *PGStore) RebootDevice(id string, force bool) error {
 		return fmt.Errorf("设备不存在: %s", id)
 	}
 	return nil
+}
+
+// ─── 指令相关方法 ─────────────────────────────────────────
+
+// CreateCommand：创建新指令并写入 commands 表
+// 返回值：成功返回完整 Command（含数据库生成的字段）
+func (s *PGStore) CreateCommand(cmd device.Command) error {
+	_, err := s.db.Exec(`
+		INSERT INTO commands (id, command_id, device_id, command_type, payload_json, status, timeout_seconds, issued_at, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	`, cmd.ID, cmd.CommandID, cmd.DeviceID, cmd.CommandType, cmd.PayloadJSON,
+		cmd.Status, cmd.TimeoutSeconds, cmd.IssuedAt, cmd.CreatedBy)
+	return err
+}
+
+// GetCommand：根据内部编号获取指令
+func (s *PGStore) GetCommand(id string) (*device.Command, error) {
+	row := s.db.QueryRow(
+		"SELECT id, command_id, device_id, command_type, payload_json, status, timeout_seconds, issued_at, sent_at, executed_at, result_message, created_by, created_at, updated_at FROM commands WHERE id = $1",
+		id,
+	)
+	return s.scanCommand(row)
+}
+
+// GetCommandByUUID：根据 proto UUID 获取指令
+func (s *PGStore) GetCommandByUUID(commandID string) (*device.Command, error) {
+	row := s.db.QueryRow(
+		"SELECT id, command_id, device_id, command_type, payload_json, status, timeout_seconds, issued_at, sent_at, executed_at, result_message, created_by, created_at, updated_at FROM commands WHERE command_id = $1",
+		commandID,
+	)
+	return s.scanCommand(row)
+}
+
+// ListCommands：列出指令，支持按设备/状态/类型过滤
+func (s *PGStore) ListCommands(f device.CommandFilters) ([]device.Command, error) {
+	where := []string{}
+	args := []interface{}{}
+	argIdx := 1
+
+	if f.DeviceID != "" {
+		where = append(where, fmt.Sprintf("device_id = $%d", argIdx))
+		args = append(args, f.DeviceID)
+		argIdx++
+	}
+	if f.Status != "" {
+		where = append(where, fmt.Sprintf("status = $%d", argIdx))
+		args = append(args, f.Status)
+		argIdx++
+	}
+	if f.Type != "" {
+		where = append(where, fmt.Sprintf("command_type = $%d", argIdx))
+		args = append(args, f.Type)
+		argIdx++
+	}
+
+	limit := f.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+
+	query := "SELECT id, command_id, device_id, command_type, payload_json, status, timeout_seconds, issued_at, sent_at, executed_at, result_message, created_by, created_at, updated_at FROM commands"
+	if len(where) > 0 {
+		query += " WHERE " + strings.Join(where, " AND ")
+	}
+	query += fmt.Sprintf(" ORDER BY issued_at DESC LIMIT $%d", argIdx)
+	args = append(args, limit)
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cmds []device.Command
+	for rows.Next() {
+		var cmd device.Command
+		var sentAt, executedAt sql.NullTime
+		var resultMessage sql.NullString
+
+		err := rows.Scan(
+			&cmd.ID, &cmd.CommandID, &cmd.DeviceID, &cmd.CommandType, &cmd.PayloadJSON,
+			&cmd.Status, &cmd.TimeoutSeconds, &cmd.IssuedAt,
+			&sentAt, &executedAt, &resultMessage,
+			&cmd.CreatedBy, &cmd.CreatedAt, &cmd.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if sentAt.Valid {
+			cmd.SentAt = &sentAt.Time
+		}
+		if executedAt.Valid {
+			cmd.ExecutedAt = &executedAt.Time
+		}
+		if resultMessage.Valid {
+			cmd.ResultMessage = resultMessage.String
+		}
+		cmds = append(cmds, cmd)
+	}
+	return cmds, rows.Err()
+}
+
+// GetPendingCommands：获取某设备的待下发指令
+func (s *PGStore) GetPendingCommands(deviceID string) ([]device.Command, error) {
+	return s.ListCommands(device.CommandFilters{
+		DeviceID: deviceID,
+		Status:   device.CommandStatusPending,
+	})
+}
+
+// UpdateCommandStatus：更新指令状态（sent → completed/failed/timeout/rejected）
+func (s *PGStore) UpdateCommandStatus(id string, status string, resultMessage string) error {
+	var result sql.Result
+	var err error
+
+	now := time.Now()
+	switch status {
+	case device.CommandStatusSent:
+		result, err = s.db.Exec(
+			"UPDATE commands SET status = $1, sent_at = $2, updated_at = $2 WHERE id = $3",
+			status, now, id,
+		)
+	case device.CommandStatusCompleted, device.CommandStatusFailed, device.CommandStatusTimeout, device.CommandStatusRejected:
+		result, err = s.db.Exec(
+			"UPDATE commands SET status = $1, executed_at = $2, result_message = $3, updated_at = $2 WHERE id = $4",
+			status, now, resultMessage, id,
+		)
+	default:
+		result, err = s.db.Exec(
+			"UPDATE commands SET status = $1, updated_at = NOW() WHERE id = $2",
+			status, id,
+		)
+	}
+	if err != nil {
+		return err
+	}
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("指令不存在: %s", id)
+	}
+	return nil
+}
+
+// UpdateCommandResultByUUID：设备通过 proto UUID 回报指令执行结果
+func (s *PGStore) UpdateCommandResultByUUID(commandID string, status string, message string) error {
+	now := time.Now()
+	result, err := s.db.Exec(
+		"UPDATE commands SET status = $1, executed_at = $2, result_message = $3, updated_at = $2 WHERE command_id = $4",
+		status, now, message, commandID,
+	)
+	if err != nil {
+		return err
+	}
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("指令不存在: %s", commandID)
+	}
+	return nil
+}
+
+// ExpireTimedOutCommands：将已超时的 sent 指令标记为 timeout
+// 建议定期调用（比如每分钟一次）
+func (s *PGStore) ExpireTimedOutCommands() (int64, error) {
+	result, err := s.db.Exec(`
+		UPDATE commands SET status = 'timeout', result_message = '服务端检测超时', updated_at = NOW()
+		WHERE status = 'sent' AND sent_at + (timeout_seconds || ' seconds')::interval < NOW()
+	`)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+// scanCommand：从数据库行扫描出 Command 结构体
+func (s *PGStore) scanCommand(row *sql.Row) (*device.Command, error) {
+	var cmd device.Command
+	var sentAt, executedAt sql.NullTime
+	var resultMessage sql.NullString
+
+	err := row.Scan(
+		&cmd.ID, &cmd.CommandID, &cmd.DeviceID, &cmd.CommandType, &cmd.PayloadJSON,
+		&cmd.Status, &cmd.TimeoutSeconds, &cmd.IssuedAt,
+		&sentAt, &executedAt, &resultMessage,
+		&cmd.CreatedBy, &cmd.CreatedAt, &cmd.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if sentAt.Valid {
+		cmd.SentAt = &sentAt.Time
+	}
+	if executedAt.Valid {
+		cmd.ExecutedAt = &executedAt.Time
+	}
+	if resultMessage.Valid {
+		cmd.ResultMessage = resultMessage.String
+	}
+	return &cmd, nil
 }

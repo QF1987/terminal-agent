@@ -25,6 +25,15 @@ type Store interface {
 	GetFaultLogs(f device.LogFilters) ([]device.FaultLog, error)          // 获取故障日志
 	UpdateDeviceConfig(id string, config device.DeviceConfig) error       // 更新配置
 	RebootDevice(id string, force bool) error                             // 重启设备
+	// 指令相关
+	CreateCommand(cmd device.Command) error                               // 创建指令
+	GetCommand(id string) (*device.Command, error)                        // 获取指令（按内部编号）
+	GetCommandByUUID(commandID string) (*device.Command, error)           // 获取指令（按 proto UUID）
+	ListCommands(f device.CommandFilters) ([]device.Command, error)       // 列出指令
+	GetPendingCommands(deviceID string) ([]device.Command, error)         // 获取待下发指令
+	UpdateCommandStatus(id string, status string, resultMessage string) error // 更新指令状态
+	UpdateCommandResultByUUID(commandID string, status string, message string) error // 设备回报结果
+	ExpireTimedOutCommands() (int64, error)                               // 超时指令标记
 }
 
 // ─── MockStore 结构体 ─────────────────────────────────────
@@ -319,4 +328,117 @@ func containsHelper(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// ─── 指令相关方法（MockStore 实现） ─────────────────────────
+
+// MockStore 的指令存储
+// 注意：这只是内存实现，重启后数据丢失
+type mockCommandStore struct {
+	commands []device.Command
+}
+
+var mockCmdStore = &mockCommandStore{}
+
+func (s *MockStore) CreateCommand(cmd device.Command) error {
+	mockCmdStore.commands = append(mockCmdStore.commands, cmd)
+	return nil
+}
+
+func (s *MockStore) GetCommand(id string) (*device.Command, error) {
+	for _, cmd := range mockCmdStore.commands {
+		if cmd.ID == id {
+			return &cmd, nil
+		}
+	}
+	return nil, fmt.Errorf("指令不存在: %s", id)
+}
+
+func (s *MockStore) GetCommandByUUID(commandID string) (*device.Command, error) {
+	for _, cmd := range mockCmdStore.commands {
+		if cmd.CommandID == commandID {
+			return &cmd, nil
+		}
+	}
+	return nil, fmt.Errorf("指令不存在: %s", commandID)
+}
+
+func (s *MockStore) ListCommands(f device.CommandFilters) ([]device.Command, error) {
+	var result []device.Command
+	limit := f.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	for _, cmd := range mockCmdStore.commands {
+		if f.DeviceID != "" && cmd.DeviceID != f.DeviceID {
+			continue
+		}
+		if f.Status != "" && cmd.Status != f.Status {
+			continue
+		}
+		if f.Type != "" && cmd.CommandType != f.Type {
+			continue
+		}
+		result = append(result, cmd)
+		if len(result) >= limit {
+			break
+		}
+	}
+	return result, nil
+}
+
+func (s *MockStore) GetPendingCommands(deviceID string) ([]device.Command, error) {
+	return s.ListCommands(device.CommandFilters{
+		DeviceID: deviceID,
+		Status:   device.CommandStatusPending,
+	})
+}
+
+func (s *MockStore) UpdateCommandStatus(id string, status string, resultMessage string) error {
+	for i, cmd := range mockCmdStore.commands {
+		if cmd.ID == id {
+			mockCmdStore.commands[i].Status = status
+			mockCmdStore.commands[i].ResultMessage = resultMessage
+			now := time.Now()
+			if status == device.CommandStatusSent {
+				mockCmdStore.commands[i].SentAt = &now
+			} else {
+				mockCmdStore.commands[i].ExecutedAt = &now
+			}
+			mockCmdStore.commands[i].UpdatedAt = now
+			return nil
+		}
+	}
+	return fmt.Errorf("指令不存在: %s", id)
+}
+
+func (s *MockStore) UpdateCommandResultByUUID(commandID string, status string, message string) error {
+	for i, cmd := range mockCmdStore.commands {
+		if cmd.CommandID == commandID {
+			mockCmdStore.commands[i].Status = status
+			mockCmdStore.commands[i].ResultMessage = message
+			now := time.Now()
+			mockCmdStore.commands[i].ExecutedAt = &now
+			mockCmdStore.commands[i].UpdatedAt = now
+			return nil
+		}
+	}
+	return fmt.Errorf("指令不存在: %s", commandID)
+}
+
+func (s *MockStore) ExpireTimedOutCommands() (int64, error) {
+	var count int64
+	now := time.Now()
+	for i, cmd := range mockCmdStore.commands {
+		if cmd.Status == device.CommandStatusSent && cmd.SentAt != nil {
+			deadline := cmd.SentAt.Add(time.Duration(cmd.TimeoutSeconds) * time.Second)
+			if now.After(deadline) {
+				mockCmdStore.commands[i].Status = device.CommandStatusTimeout
+				mockCmdStore.commands[i].ResultMessage = "服务端检测超时"
+				mockCmdStore.commands[i].UpdatedAt = now
+				count++
+			}
+		}
+	}
+	return count, nil
 }

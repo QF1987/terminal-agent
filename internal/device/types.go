@@ -61,19 +61,29 @@ type DeviceStats struct {
 	FaultCount        int `json:"faultCount"`        // 故障次数
 }
 
+// DeviceCapability：设备能力声明（对应 proto DeviceCapability）
+type DeviceCapability struct {
+	FirmwareVersion   string   `json:"firmware_version"`   // 固件版本号
+	ProtoVersion      int      `json:"proto_version"`      // 协议版本号
+	SupportedFeatures []string `json:"supported_features"` // 支持的功能列表
+}
+
 // Device：设备信息（主数据模型）
 type Device struct {
-	ID            string       `json:"id"`            // 设备ID
-	Name          string       `json:"name"`          // 设备名称
-	Type          string       `json:"type"`          // 设备类型
-	Region        string       `json:"region"`        // 所属区域
-	Address       string       `json:"address"`       // 安装地址
-	Status        string       `json:"status"`        // 当前状态
-	LastHeartbeat time.Time    `json:"lastHeartbeat"` // 最后心跳时间
-	Firmware      string       `json:"firmware"`      // 固件版本
-	Config        DeviceConfig `json:"config"`        // 设备配置
-	InstalledAt   time.Time    `json:"installedAt"`   // 安装时间
-	Stats         DeviceStats  `json:"stats"`         // 运行统计
+	ID            string           `json:"id"`            // 设备ID
+	Name          string           `json:"name"`          // 设备名称
+	Type          string           `json:"type"`          // 设备类型
+	Region        string           `json:"region"`        // 所属区域
+	Address       string           `json:"address"`       // 安装地址
+	Status        string           `json:"status"`        // 当前状态
+	LastHeartbeat time.Time        `json:"lastHeartbeat"` // 最后心跳时间
+	Firmware      string           `json:"firmware"`      // 固件版本
+	Config        DeviceConfig     `json:"config"`        // 设备配置
+	InstalledAt   time.Time        `json:"installedAt"`   // 安装时间
+	Stats         DeviceStats      `json:"stats"`         // 运行统计
+	Token         string           `json:"token"`         // 设备令牌（第一阶段认证）
+	DeviceSecret  string           `json:"deviceSecret"`  // 设备密钥（预留给 HMAC 签名阶段）
+	Capabilities  DeviceCapability `json:"capabilities"`  // 设备能力声明
 }
 
 // FaultLog：故障日志
@@ -104,5 +114,49 @@ type LogFilters struct {
 	Severity string // 严重程度
 	Type     string // 日志类型
 	Days     int    // 最近几天
+	Limit    int    // 返回条数
+}
+
+// ─── 指令相关常量 ─────────────────────────────────────────
+const (
+	CommandTypeReboot         = "reboot"           // 重启设备
+	CommandTypeUpdateConfig   = "update_config"    // 修改配置
+	CommandTypeUpgradeFirmware = "upgrade_firmware" // OTA 固件升级
+	CommandTypeCustom         = "custom"           // 自定义指令
+)
+
+const (
+	CommandStatusPending   = "pending"    // 待下发
+	CommandStatusSent      = "sent"       // 已推送给设备
+	CommandStatusExecuting = "executing"  // 设备执行中
+	CommandStatusCompleted = "completed"  // 执行成功
+	CommandStatusFailed    = "failed"     // 执行失败
+	CommandStatusTimeout   = "timeout"    // 执行超时
+	CommandStatusRejected  = "rejected"   // 设备拒绝执行
+)
+
+// Command：指令数据模型
+type Command struct {
+	ID             string     `json:"id"`             // 内部编号 CMD-001
+	CommandID      string     `json:"commandId"`      // UUID，与 proto 一致，设备靠这个回报
+	DeviceID       string     `json:"deviceId"`       // 目标设备
+	CommandType    string     `json:"commandType"`    // 指令类型
+	PayloadJSON    string     `json:"payloadJson"`    // 指令参数（JSON 字符串）
+	Status         string     `json:"status"`         // 指令状态
+	TimeoutSeconds int        `json:"timeoutSeconds"` // 执行超时（秒）
+	IssuedAt       time.Time  `json:"issuedAt"`       // 服务端下发时间
+	SentAt         *time.Time `json:"sentAt,omitempty"`    // 实际推送给设备的时间
+	ExecutedAt     *time.Time `json:"executedAt,omitempty"` // 设备回报执行完成时间
+	ResultMessage  string     `json:"resultMessage"`  // 设备回报的执行结果描述
+	CreatedBy      string     `json:"createdBy"`      // 谁发起的（操作员/API）
+	CreatedAt      time.Time  `json:"createdAt"`      // 记录创建时间
+	UpdatedAt      time.Time  `json:"updatedAt"`      // 记录更新时间
+}
+
+// CommandFilters：指令查询筛选条件
+type CommandFilters struct {
+	DeviceID string // 设备ID
+	Status   string // 指令状态
+	Type     string // 指令类型
 	Limit    int    // 返回条数
 }
