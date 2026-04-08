@@ -57,7 +57,7 @@ var infoCmd = &cobra.Command{
 ├─────────────────────────────────────────────────┤
 │  设备配置                                        │
 │  屏幕亮度: %-5d%%    音量: %-5d%%             │
-│  交易超时: %-5d秒   自动重启: %-5v %s       │
+│  自动重启: %-5v %s                          │
 └─────────────────────────────────────────────────┘
 `,
 			emoji, device.Name,
@@ -72,7 +72,7 @@ var infoCmd = &cobra.Command{
 			device.Stats.TotalTransactions, device.Stats.TodayTransactions,
 			device.Stats.Uptime, device.Stats.FaultCount,
 			device.Config.ScreenBrightness, device.Config.VolumeLevel,
-			device.Config.TransactionTimeout, device.Config.AutoRebootEnabled, device.Config.AutoRebootTime,
+			device.Config.AutoRebootEnabled, device.Config.AutoRebootTime,
 		)
 	},
 }

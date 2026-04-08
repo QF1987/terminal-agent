@@ -134,12 +134,11 @@ func (s *MockStore) generateData() {
 			LastHeartbeat: now.Add(-time.Duration(rand.Intn(3600)) * time.Second), // 随机过去1小时内
 			Firmware:      fmt.Sprintf("2.%d.%d", rand.Intn(3), rand.Intn(10)),
 			Config: device.DeviceConfig{
-				TransactionTimeout: 30,
-				ScreenBrightness:   60 + rand.Intn(40),  // 60-99
-				VolumeLevel:        50 + rand.Intn(50),   // 50-99
-				AutoRebootEnabled:  rand.Intn(2) == 1,    // 随机 true/false
-				AutoRebootTime:     fmt.Sprintf("%02d:00", rand.Intn(6)),
-				MedicineCategory:   []string{"处方药", "OTC", "保健品"},
+				ScreenBrightness:  60 + rand.Intn(40),  // 60-99
+				VolumeLevel:       50 + rand.Intn(50),   // 50-99
+				AutoRebootEnabled: rand.Intn(2) == 1,    // 随机 true/false
+				AutoRebootTime:    fmt.Sprintf("%02d:00", rand.Intn(6)),
+				CustomConfigJSON:  fmt.Sprintf(`{"transaction_timeout":30,"medicine_category":["处方药","OTC","保健品"]}`),
 			},
 			InstalledAt: now.AddDate(-1, -rand.Intn(12), 0), // 随机过去1年内安装
 			Stats: device.DeviceStats{

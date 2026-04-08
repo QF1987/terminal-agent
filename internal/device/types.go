@@ -43,14 +43,26 @@ const (
 // Go 用 struct 定义结构体，类似 TypeScript 的 interface
 // 字段后面的 `json:"xxx"` 是 JSON 序列化标签（类似 TS 的 @JsonProperty）
 
-// DeviceConfig：设备配置
+// DeviceConfig：设备配置（对应 proto DeviceConfig）
+// 只保留所有终端类型通用的配置项，业务相关配置放 CustomConfigJSON
 type DeviceConfig struct {
-	TransactionTimeout int      `json:"transactionTimeout"` // 交易超时（秒）
-	ScreenBrightness   int      `json:"screenBrightness"`   // 屏幕亮度（%）
-	VolumeLevel        int      `json:"volumeLevel"`        // 音量（%）
-	AutoRebootEnabled  bool     `json:"autoRebootEnabled"`  // 是否启用自动重启
-	AutoRebootTime     string   `json:"autoRebootTime"`     // 自动重启时间
-	MedicineCategory   []string `json:"medicineCategory"`   // 药品分类
+	ScreenBrightness  int    `json:"screenBrightness"`  // 屏幕亮度，0-100
+	VolumeLevel       int    `json:"volumeLevel"`       // 音量，0-100
+	AutoRebootEnabled bool   `json:"autoRebootEnabled"` // 是否开启自动重启
+	AutoRebootTime    string `json:"autoRebootTime"`    // 自动重启时间 "HH:MM"
+	CustomConfigJSON  string `json:"customConfigJson"`  // 业务自定义配置（JSON 字符串）
+}
+
+// DeviceMetrics：设备性能指标（对应 proto DeviceMetrics）
+// 用于 StatusReport 和未来的 KAIROS 感知层
+type DeviceMetrics struct {
+	CPUPercent           float32 `json:"cpuPercent"`           // CPU 使用率，0.0-100.0
+	MemoryPercent        float32 `json:"memoryPercent"`        // 内存使用率，0.0-100.0
+	DiskPercent          float32 `json:"diskPercent"`          // 磁盘使用率，0.0-100.0
+	NetworkRxBytes       int64   `json:"networkRxBytes"`       // 累计网络接收字节
+	NetworkTxBytes       int64   `json:"networkTxBytes"`       // 累计网络发送字节
+	TransactionCountToday int32  `json:"transactionCountToday"` // 今日交易笔数
+	UptimeSeconds        int32   `json:"uptimeSeconds"`        // 运行时长（秒）
 }
 
 // DeviceStats：设备统计
@@ -63,9 +75,9 @@ type DeviceStats struct {
 
 // DeviceCapability：设备能力声明（对应 proto DeviceCapability）
 type DeviceCapability struct {
-	FirmwareVersion   string   `json:"firmware_version"`   // 固件版本号
-	ProtoVersion      int      `json:"proto_version"`      // 协议版本号
-	SupportedFeatures []string `json:"supported_features"` // 支持的功能列表
+	FirmwareVersion   string   `json:"firmwareVersion"`   // 固件版本号
+	ProtoVersion      int32    `json:"protoVersion"`      // 协议版本号
+	SupportedFeatures []string `json:"supportedFeatures"` // 支持的功能列表
 }
 
 // Device：设备信息（主数据模型）
@@ -117,14 +129,82 @@ type LogFilters struct {
 	Limit    int    // 返回条数
 }
 
-// ─── 指令相关常量 ─────────────────────────────────────────
+// ─── 心跳 & 状态上报（对应 proto 请求/响应） ──────────────
+
+// HeartbeatRequest：心跳请求（对应 proto HeartbeatRequest）
+type HeartbeatRequest struct {
+	DeviceID      string           `json:"deviceId"`      // 设备唯一标识
+	Timestamp     int64            `json:"timestamp"`     // 设备本地时间毫秒时间戳
+	CPUPercent    float32          `json:"cpuPercent"`    // CPU 使用率
+	MemoryPercent float32          `json:"memoryPercent"` // 内存使用率
+	DiskPercent   float32          `json:"diskPercent"`   // 磁盘使用率
+	UptimeSeconds int32            `json:"uptimeSeconds"` // 累计运行时长（秒）
+	Capability    *DeviceCapability `json:"capability,omitempty"` // 设备能力声明（可选）
+}
+
+// HeartbeatResponse：心跳响应（对应 proto HeartbeatResponse）
+type HeartbeatResponse struct {
+	HasPendingCommand bool  `json:"hasPendingCommand"` // 是否有待执行指令
+	ServerTime        int64 `json:"serverTime"`        // 服务端当前时间毫秒时间戳
+}
+
+// StatusReport：状态上报（对应 proto StatusReport）
+type StatusReport struct {
+	DeviceID        string       `json:"deviceId"`        // 设备唯一标识
+	Timestamp       int64        `json:"timestamp"`       // 上报时间毫秒时间戳
+	Status          string       `json:"status"`          // 设备状态 online/offline/error/maintenance
+	FirmwareVersion string       `json:"firmwareVersion"` // 当前固件版本号
+	Metrics         DeviceMetrics `json:"metrics"`        // 性能指标快照
+	Config          DeviceConfig `json:"config"`          // 当前生效的配置
+}
+
+// StatusReportResponse：状态上报响应（对应 proto StatusReportResponse）
+type StatusReportResponse struct {
+	Accepted bool   `json:"accepted"` // 是否接受此次上报
+	Message  string `json:"message"`  // 结果描述
+}
+
+// ─── 事件上报（对应 proto EventReport） ──────────────────
+
+// 事件类型常量
 const (
-	CommandTypeReboot         = "reboot"           // 重启设备
-	CommandTypeUpdateConfig   = "update_config"    // 修改配置
-	CommandTypeUpgradeFirmware = "upgrade_firmware" // OTA 固件升级
-	CommandTypeCustom         = "custom"           // 自定义指令
+	EventFault            = "fault"             // 设备故障
+	EventTransactionFail  = "transaction_fail"  // 交易失败
+	EventConfigChange     = "config_change"     // 配置变更
+	EventReboot           = "reboot"            // 设备重启
+	EventStockAlert       = "stock_alert"       // 库存告警
+	EventCustom           = "custom"            // 自定义事件
 )
 
+// 事件严重程度常量（复用已有的 SeverityLow/Medium/High/Critical）
+
+// EventReport：事件上报（对应 proto EventReport）
+type EventReport struct {
+	DeviceID  string `json:"deviceId"`  // 设备唯一标识
+	Timestamp int64  `json:"timestamp"` // 事件发生时间毫秒时间戳
+	EventType string `json:"eventType"` // 事件类型
+	Severity  string `json:"severity"`  // 严重程度
+	Message   string `json:"message"`   // 事件描述
+	DetailJSON string `json:"detailJson"` // 扩展详情（JSON 字符串）
+}
+
+// EventReportResponse：事件上报响应（对应 proto EventReportResponse）
+type EventReportResponse struct {
+	Accepted bool   `json:"accepted"`
+	Message  string `json:"message"`
+}
+
+// ─── 指令（对应 proto Command + CommandResult） ──────────
+
+// 指令类型常量
+const (
+	CommandTypeReboot          = "reboot"           // 重启设备
+	CommandTypeUpdateConfig    = "update_config"    // 修改配置
+	CommandTypeUpgradeFirmware = "upgrade_firmware" // OTA 固件升级
+	CommandTypeCustom          = "custom"           // 自定义指令
+)
+
+// 指令状态常量
 const (
 	CommandStatusPending   = "pending"    // 待下发
 	CommandStatusSent      = "sent"       // 已推送给设备
@@ -135,22 +215,37 @@ const (
 	CommandStatusRejected  = "rejected"   // 设备拒绝执行
 )
 
-// Command：指令数据模型
+// Command：指令数据模型（对应 proto Command）
 type Command struct {
 	ID             string     `json:"id"`             // 内部编号 CMD-001
-	CommandID      string     `json:"commandId"`      // UUID，与 proto 一致，设备靠这个回报
+	CommandID      string     `json:"commandId"`      // UUID，与 proto 一致
 	DeviceID       string     `json:"deviceId"`       // 目标设备
 	CommandType    string     `json:"commandType"`    // 指令类型
 	PayloadJSON    string     `json:"payloadJson"`    // 指令参数（JSON 字符串）
 	Status         string     `json:"status"`         // 指令状态
-	TimeoutSeconds int        `json:"timeoutSeconds"` // 执行超时（秒）
-	IssuedAt       time.Time  `json:"issuedAt"`       // 服务端下发时间
-	SentAt         *time.Time `json:"sentAt,omitempty"`    // 实际推送给设备的时间
-	ExecutedAt     *time.Time `json:"executedAt,omitempty"` // 设备回报执行完成时间
-	ResultMessage  string     `json:"resultMessage"`  // 设备回报的执行结果描述
-	CreatedBy      string     `json:"createdBy"`      // 谁发起的（操作员/API）
-	CreatedAt      time.Time  `json:"createdAt"`      // 记录创建时间
-	UpdatedAt      time.Time  `json:"updatedAt"`      // 记录更新时间
+	TimeoutSeconds int64      `json:"timeoutSeconds"` // 执行超时（秒），proto 是 int64
+	IssuedAt       int64      `json:"issuedAt"`       // 服务端下发时间毫秒时间戳（proto 是 int64）
+	SentAt         *time.Time `json:"sentAt,omitempty"`
+	ExecutedAt     *time.Time `json:"executedAt,omitempty"`
+	ResultMessage  string     `json:"resultMessage"`
+	CreatedBy      string     `json:"createdBy"`
+	CreatedAt      time.Time  `json:"createdAt"`
+	UpdatedAt      time.Time  `json:"updatedAt"`
+}
+
+// CommandResult：指令执行结果（对应 proto CommandResult）
+type CommandResult struct {
+	CommandID  string `json:"commandId"`  // 指令 ID
+	DeviceID   string `json:"deviceId"`   // 设备 ID
+	Status     string `json:"status"`     // success/failed/timeout/rejected
+	Message    string `json:"message"`    // 执行结果描述
+	ExecutedAt int64  `json:"executedAt"` // 执行完成时间毫秒时间戳
+}
+
+// CommandResultResponse：指令执行结果响应（对应 proto CommandResultResponse）
+type CommandResultResponse struct {
+	Accepted bool   `json:"accepted"`
+	Message  string `json:"message"`
 }
 
 // CommandFilters：指令查询筛选条件

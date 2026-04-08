@@ -210,12 +210,11 @@ func SeedData(db *sql.DB) error {
 
 		// 构建设备配置（随机生成参数）
 		config := device.DeviceConfig{
-			TransactionTimeout: 30,                        // 交易超时时间（秒）
-			ScreenBrightness:   60 + rand.Intn(40),        // 屏幕亮度 60-99
-			VolumeLevel:        50 + rand.Intn(50),        // 音量 50-99
-			AutoRebootEnabled:  rand.Intn(2) == 1,         // 是否开启自动重启（50% 概率）
-			AutoRebootTime:     fmt.Sprintf("%02d:00", rand.Intn(6)),  // 自动重启时间，如 "03:00"
-			MedicineCategory:   []string{"处方药", "OTC", "保健品"},   // 售卖的药品类别
+			ScreenBrightness:  60 + rand.Intn(40),        // 屏幕亮度 60-99
+			VolumeLevel:       50 + rand.Intn(50),        // 音量 50-99
+			AutoRebootEnabled: rand.Intn(2) == 1,         // 是否开启自动重启（50% 概率）
+			AutoRebootTime:    fmt.Sprintf("%02d:00", rand.Intn(6)),  // 自动重启时间，如 "03:00"
+			CustomConfigJSON:  fmt.Sprintf(`{"transaction_timeout":30,"medicine_category":["处方药","OTC","保健品"]}`),
 		}
 		configJSON, _ := json.Marshal(config)  // 序列化成 JSON，_ 忽略错误（config 结构简单不会失败）
 
